@@ -238,7 +238,7 @@ def test_git_readonly_disables_fsmonitor_and_strips_inherited_git_overrides(tmp_
 
     _git_readonly(tmp_path, "status", "--short", "--branch")
 
-    assert captured["command"][:6] == [
+    assert captured["command"][:7] == [
         "git", "-c", "core.fsmonitor=false",
         "-c", "core.untrackedCache=false", "-C", str(tmp_path),
     ]
