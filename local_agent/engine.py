@@ -70,6 +70,25 @@ def _open_local_ollama(request, timeout):
     return opener.open(request, timeout=timeout)
 
 
+
+def _git_readonly(root: Path, *arguments: str, timeout: int = 20):
+    """Run bounded Git metadata reads without repository fsmonitor hooks or inherited Git overrides."""
+    env = {
+        key: value for key, value in os.environ.items()
+        if not key.upper().startswith("GIT_")
+    }
+    env["GIT_CONFIG_NOSYSTEM"] = "1"
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    return subprocess.run(
+        [
+            "git", "-c", "core.fsmonitor=false",
+            "-c", "core.untrackedCache=false",
+            "-C", str(root), *arguments,
+        ],
+        capture_output=True, text=True, timeout=timeout, check=True, env=env,
+    )
+
+
 def load_config(path: Path) -> dict[str, Any]:
     config = json.loads(path.read_text(encoding="utf-8-sig"))
     if not isinstance(config, dict):
@@ -112,10 +131,7 @@ def load_config(path: Path) -> dict[str, Any]:
         if any(root == other or root in other.parents or other in root.parents for other in seen):
             raise AgentError(f"Project paths must be distinct and non-overlapping: {root}")
         seen.append(root)
-        git_root = subprocess.run(
-            ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
-            capture_output=True, text=True, timeout=15, check=True,
-        ).stdout.strip()
+        git_root = _git_readonly(root, "rev-parse", "--show-toplevel", timeout=15).stdout.strip()
         if Path(git_root).resolve() != root:
             raise AgentError(f"Project path must be the repository root: {root}")
         review_files = project.get("review_files", [])
@@ -170,7 +186,17 @@ def load_config(path: Path) -> dict[str, Any]:
 
 def safe_read(root: Path, relative: str, limit: int = 12000) -> str:
     rel = Path(relative)
-    if rel.is_absolute() or ".." in rel.parts or any(part.lower() in {".env", "secrets", "credentials"} for part in rel.parts):
+    blocked_names = {"secrets", "credentials", ".git", ".ssh", ".npmrc", ".pypirc", ".netrc", "id_rsa", "id_ed25519"}
+    if (
+        rel.is_absolute()
+        or ".." in rel.parts
+        or any(
+            part.lower() in blocked_names
+            or part.lower().startswith(".env")
+            or part.lower().endswith((".pem", ".key", ".p12", ".pfx", ".jks", ".keystore"))
+            for part in rel.parts
+        )
+    ):
         return ""
     target = (root / rel).resolve()
     if root.resolve() not in target.parents or not target.is_file():
@@ -185,8 +211,8 @@ def safe_read(root: Path, relative: str, limit: int = 12000) -> str:
 
 def collect_snapshot(project: dict[str, Any]) -> str:
     root: Path = project["resolved_path"]
-    status = subprocess.run(["git", "-C", str(root), "status", "--short", "--branch"], capture_output=True, text=True, timeout=20, check=True).stdout.strip()
-    history = subprocess.run(["git", "-C", str(root), "log", "-5", "--oneline", "--decorate"], capture_output=True, text=True, timeout=20, check=True).stdout.strip()
+    status = _git_readonly(root, "status", "--short", "--branch").stdout.strip()
+    history = _git_readonly(root, "log", "-5", "--oneline", "--decorate").stdout.strip()
     tree: list[str] = []
     for current, dirs, names in os.walk(root):
         dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
