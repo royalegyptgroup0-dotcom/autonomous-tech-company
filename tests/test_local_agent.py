@@ -186,3 +186,21 @@ def test_config_rejects_unsafe_context_lengths(tmp_path, monkeypatch, context_le
     )
     with pytest.raises(AgentError, match="context_length"):
         load_config(config_path)
+
+
+
+def test_config_accepts_utf8_bom_from_windows_powershell(tmp_path, monkeypatch):
+    config_path, root = _write_agent_config(tmp_path, tmp_path / "outside")
+    config_path.write_text(
+        json.dumps({
+            "workspace": str(tmp_path / "outside"),
+            "projects": [{"id": "sample-repo", "path": str(root), "enabled": True}],
+        }),
+        encoding="utf-8-sig",
+    )
+    monkeypatch.setattr(
+        "local_agent.engine.subprocess.run",
+        lambda *args, **kwargs: SimpleNamespace(stdout=str(root)),
+    )
+    config = load_config(config_path)
+    assert config["enabled_projects"][0]["id"] == "sample-repo"
