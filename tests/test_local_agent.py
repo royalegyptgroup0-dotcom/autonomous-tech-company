@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from local_agent.engine import PROJECT_ID, safe_read
+import pytest
+
+from local_agent.engine import AgentError, PROJECT_ID, local_ollama_base_url, safe_read
 
 
 def test_project_id_validation():
@@ -28,3 +30,22 @@ def test_safe_read_skips_secret_names(tmp_path: Path):
 
 def test_safe_read_rejects_absolute_path(tmp_path: Path):
     assert safe_read(tmp_path, str((tmp_path / "README.md").resolve())) == ""
+
+
+
+def test_ollama_url_accepts_loopback_addresses():
+    assert local_ollama_base_url("http://127.0.0.1:11434/") == "http://127.0.0.1:11434"
+    assert local_ollama_base_url("http://[::1]:11434") == "http://[::1]:11434"
+
+
+@pytest.mark.parametrize("url", [
+    "https://127.0.0.1:11434",
+    "http://localhost:11434",
+    "http://192.0.2.10:11434",
+    "http://user:pass@127.0.0.1:11434",
+    "http://127.0.0.1:11434/api",
+    "http://127.0.0.1:11434/?target=remote",
+])
+def test_ollama_url_rejects_non_loopback_or_ambiguous_urls(url):
+    with pytest.raises(AgentError):
+        local_ollama_base_url(url)
