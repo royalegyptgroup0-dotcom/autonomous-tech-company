@@ -56,7 +56,7 @@ def parse_ls_tree_output(
     max_entries: int = 500,
     max_total_bytes: int = 20_000_000,
 ) -> PinnedTreeMetadata:
-    """Parse \`git ls-tree -r -l -z <full-commit> -- <exact-paths>\` output.
+    """Parse `git ls-tree -r -l -z <full-commit> -- <exact-paths>` output.
 
     Only regular Git blobs are accepted. Every expected path must appear
     exactly once; unexpected entries, links, submodules, trees, malformed
