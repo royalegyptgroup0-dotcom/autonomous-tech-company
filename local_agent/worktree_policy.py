@@ -73,7 +73,7 @@ def validate_disposable_worktree(
 
     checked: list[str] = []
     for raw in allowed_paths:
-        if not isinstance(raw, str) or not raw or raw.startswith(("/", "\\\\")) or "\\\\" in raw:
+        if not isinstance(raw, str) or not raw or raw.startswith(("/", "\\")) or "\\" in raw:
             raise WorktreePolicyError("Target paths must be non-empty relative POSIX paths")
         parts = raw.split("/")
         if any(part in ("", ".", "..") for part in parts) or ":" in raw:
