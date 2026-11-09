@@ -21,10 +21,11 @@ that a test result returned by a guest is authentic.
 Microsoft documents two relevant command paths:
 
 - The native Windows Sandbox CLI (`wsb`) can execute a command and return its
-  exit code, but its documentation explicitly says process I/O is not supported,
-  so command stdout/stderr cannot be retrieved through that interface. It also
-  requires an active user session for commands running as the logged-in user.
-  See [Windows Sandbox command-line interface](https://learn.microsoft.com/en-us/windows/security/application-security/application-isolation/windows-sandbox/windows-sandbox-cli).
+  exit code. It supports `ExistingLogin` and `System` run-as contexts. However,
+  its documentation explicitly says process I/O is not supported, so command
+  stdout/stderr cannot be retrieved through that interface. An active user
+  session is required for `ExistingLogin`. See
+  [Windows Sandbox command-line interface](https://learn.microsoft.com/en-us/windows/security/application-security/application-isolation/windows-sandbox/windows-sandbox-cli).
 - The Microsoft `winapp` Sandbox workflow can forward guest process streams,
   but its documentation says apps and workflows share the same guest user,
   desktop, registry, packages, runtimes and network access and can interfere
@@ -36,20 +37,29 @@ Microsoft documents two relevant command paths:
 Microsoft also warns that changes to host folders mapped with write permission
 persist after the Sandbox is disposed, and documents that LogonCommand runs
 under the Sandbox container user, which should be an administrator account.
-Therefore, a writable mapped folder and a simple LogonCommand are not enough
-to establish a trusted report channel. See
-[Use and configure Windows Sandbox](https://learn.microsoft.com/en-us/windows/security/application-security/application-isolation/windows-sandbox/windows-sandbox-configure-using-wsb-file).
+See [Use and configure Windows Sandbox](https://learn.microsoft.com/en-us/windows/security/application-security/application-isolation/windows-sandbox/windows-sandbox-configure-using-wsb-file).
 
-These findings do not prove that no future solution exists. They do mean that
-the currently documented native CLI does not provide the required process
-output channel, while the alternative documented workflow has shared-user and
-network-related characteristics that need a separate security assessment.
+## Candidate narrow result channel — not yet approved
+
+The native `wsb exec` exit code may provide a limited pass/fail signal without
+returning stdout/stderr. A possible design to investigate is:
+
+1. Launch a fixed, trusted guest bootstrap as `System` through `wsb exec`.
+2. Keep the pinned source snapshot read-only.
+3. Run the untrusted test workload under a separately restricted guest token,
+   not as the bootstrap's `System` identity.
+4. Have the bootstrap return only a bounded exit status to the native CLI.
+5. If diagnostic logs are required, use a separate host output directory whose
+   ACLs are proven inaccessible to the test token; never trust a guest-writable
+   report file merely because it has a checksum or nonce.
+
+This is only a research hypothesis. The docs do not establish that the proposed
+privilege separation, mapped-folder ACL behavior, bootstrap integrity, or
+process-tree containment will work as required. Each must be proven on the
+supported host. If those properties cannot be demonstrated, do not treat the
+exit code or any guest-written report as authenticated evidence.
 
 ## Critical result-channel problem
-
-A future guest bootstrap needs a way to return command results to the host.
-Windows Sandbox currently has no implemented authenticated host/guest result
-channel in this project.
 
 A writable mapped output directory is not, by itself, trustworthy: the code
 under test runs inside the same guest and could write, replace, or forge the
@@ -58,8 +68,8 @@ that same writable mapping does not solve this problem if the guest workload can
 read or alter it.
 
 Likewise, a successful launch of WindowsSandbox.exe is not evidence that a
-validation command ran or passed. Closing the Sandbox process is not a
-substitute for a verified child-process exit code.
+validation command ran or passed. The host must distinguish the trusted
+bootstrap's exit code from any value produced by the untrusted workload.
 
 Therefore, no host-side patch decision, automatic approval, or success claim may
 be based solely on an untrusted guest-writable report.
@@ -70,26 +80,24 @@ be based solely on an untrusted guest-writable report.
    test code modify the host snapshot or its ownership marker.
 2. **Separate scratch:** keep temporary files and caches inside the guest's
    disposable local filesystem wherever possible.
-3. **Authenticated result channel:** design and independently review a host/guest
-   result mechanism that test code cannot write, replace, impersonate, or
-   bypass. If no defensible channel is available with the supported Windows
-   Sandbox interfaces, stop at manual/advisory validation rather than inventing
-   an attestation mechanism.
+3. **Authenticated result channel:** independently prove that the trusted
+   bootstrap's exit status cannot be forged or bypassed by the test workload.
+   Prove any separate output directory's ACLs from inside the actual guest.
 4. **Least privilege:** run the test workload with fewer guest privileges than
    the trusted bootstrap and result collector, and prove that it cannot alter
    the collector, its process, its output channel, or its credentials.
 5. **Fixed commands only:** select exact argv vectors from the trusted local
    validation registry. No model-generated shell strings, command interpolation,
    or arbitrary LogonCommand values.
-6. **Process containment:** prove that timeout terminates the entire guest test
-   process tree and that a timeout, guest crash, malformed response, missing
-   completion marker, or host shutdown is always a failure.
+6. **Process containment:** prove that timeout stops the exact Sandbox instance
+   and all guest child processes. A timeout, guest crash, malformed response,
+   missing completion marker, or host shutdown is always a failure.
 7. **Fail-closed host lifecycle:** launch only after explicit local opt-in;
    verify the exact profile and snapshot identity before launch; never fall back
    to ordinary host subprocess execution; clean up only with the existing
    ownership receipt and exact-tree reconciliation.
 8. **Actual-host validation:** verify feature availability and a successful
-   launch/close cycle on the user's Windows machine before enabling any
+   launch/exec/stop cycle on the user's Windows machine before enabling any
    execution path. Hosted CI unit tests cannot prove this.
 
 ## Explicit non-goals
