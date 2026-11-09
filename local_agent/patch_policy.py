@@ -61,7 +61,7 @@ _DIFF_HEADER = re.compile(r"^diff --git a/(.+) b/(.+)$")
 _HUNK_HEADER = re.compile(
     r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?: .*)?$"
 )
-_INDEX_LINE = re.compile(r"^index [0-9a-fA-F]+\.\.[0-9a-fA-F]+$")
+_INDEX_LINE = re.compile(r"^index [0-9a-fA-F]+\.\.[0-9a-fA-F]+(?: (?:100644|100755))?$")
 
 
 def _validate_path(path: str, limits: PatchLimits) -> str:
