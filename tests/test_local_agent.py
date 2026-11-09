@@ -143,6 +143,43 @@ def test_config_rejects_invalid_review_file_allowlist(tmp_path, monkeypatch):
         load_config(config_path)
 
 
+
+def test_config_rejects_more_than_50_review_files(tmp_path, monkeypatch):
+    config_path, root = _write_agent_config(tmp_path, tmp_path / "outside")
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    config["projects"][0]["review_files"] = [f"src/file_{i}.py" for i in range(51)]
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    monkeypatch.setattr(
+        "local_agent.engine.subprocess.run",
+        lambda *args, **kwargs: SimpleNamespace(stdout=str(root)),
+    )
+    with pytest.raises(AgentError, match="at most 50"):
+        load_config(config_path)
+
+
+def test_snapshot_is_bounded_and_does_not_collect_untracked_file_list(tmp_path, monkeypatch):
+    root = tmp_path / "repo"
+    root.mkdir()
+    (root / "README.md").write_text("R" * 20000, encoding="utf-8")
+    (root / "docs").mkdir()
+    (root / "docs" / "ROADMAP.md").write_text("D" * 20000, encoding="utf-8")
+    calls = []
+
+    def fake_git(root_arg, *arguments, **kwargs):
+        calls.append(arguments)
+        output = "S" * 12000 if arguments[0] == "status" else "H" * 3000
+        return SimpleNamespace(stdout=output)
+
+    monkeypatch.setattr("local_agent.engine._git_readonly", fake_git)
+    snapshot = collect_snapshot({
+        "id": "sample-repo",
+        "resolved_path": root,
+        "review_files": [],
+    })
+    assert len(snapshot) <= 40000
+    assert any("--untracked-files=no" in args for args in calls)
+
+
 def test_snapshot_includes_only_explicitly_allowlisted_source_contents(tmp_path, monkeypatch):
     root = tmp_path / "repo"
     source_dir = root / "src"
