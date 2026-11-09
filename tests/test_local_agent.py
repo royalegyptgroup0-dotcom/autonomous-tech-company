@@ -181,8 +181,8 @@ def test_snapshot_is_bounded_and_does_not_collect_untracked_file_list(tmp_path, 
         "review_files": [],
     })
     assert len(snapshot) <= 40000
-    assert "\\nGIT STATUS:\\n" in snapshot
-    assert "\\n\\nSOURCE FILES:\\n" in snapshot
+    assert "\nGIT STATUS:\n" in snapshot
+    assert "\n\nSOURCE FILES:\n" in snapshot
     assert any("--untracked-files=no" in args for args in calls)
 
 
