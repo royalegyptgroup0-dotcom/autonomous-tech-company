@@ -160,3 +160,29 @@ def test_snapshot_includes_only_explicitly_allowlisted_source_contents(tmp_path,
     })
     assert "SAFE_REVIEW_CONTENT = 42" in snapshot
     assert "DO_NOT_INCLUDE_THIS_CONTENT" not in snapshot
+
+
+def test_config_defaults_to_installed_small_local_model_and_bounded_context(tmp_path, monkeypatch):
+    config_path, root = _write_agent_config(tmp_path, tmp_path / "outside")
+    monkeypatch.setattr(
+        "local_agent.engine.subprocess.run",
+        lambda *args, **kwargs: SimpleNamespace(stdout=str(root)),
+    )
+    config = load_config(config_path)
+    assert config["ollama"]["model"] == "qwen2.5:3b"
+    assert config["ollama"]["context_length"] == 4096
+    assert config["ollama"]["timeout_seconds"] == 300
+
+
+@pytest.mark.parametrize("context_length", [0, 1024, 8192 + 1, "not-a-number"])
+def test_config_rejects_unsafe_context_lengths(tmp_path, monkeypatch, context_length):
+    config_path, root = _write_agent_config(tmp_path, tmp_path / "outside")
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    config["ollama"] = {"context_length": context_length}
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    monkeypatch.setattr(
+        "local_agent.engine.subprocess.run",
+        lambda *args, **kwargs: SimpleNamespace(stdout=str(root)),
+    )
+    with pytest.raises(AgentError, match="context_length"):
+        load_config(config_path)
