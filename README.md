@@ -4,8 +4,9 @@ An independent technology-company foundation focused on software engineering, in
 
 ## Website
 The responsive company website is maintained in `web/`:
-- `index.html` — responsive company landing page
-- `styles.css` — visual system and responsive layouts
+- `index.html` — English company landing page
+- `ar/index.html` — Arabic company landing page (RTL)
+- `styles.css` and `ar/ar.css` — responsive visual system and Arabic layout
 - `app.js` — accessible mobile navigation
 - `favicon.svg` — lightweight neutral favicon
 
