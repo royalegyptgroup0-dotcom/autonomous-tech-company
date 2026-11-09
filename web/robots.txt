@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://autonomous-tech-company.pages.dev/sitemap.xml
