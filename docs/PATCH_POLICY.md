@@ -26,7 +26,7 @@ Callers may lower limits. They must not raise them without a separate security r
 
 - Empty or missing allowlists.
 - Absolute paths, drive paths, backslashes, whitespace, NUL, repeated separators, dot segments, and parent traversal.
-- Environment files, Git metadata, common credential paths, private-key formats, and protected paths such as `.github/`, `config/`, `infra/`, and `deploy/`.
+- Environment files, Git metadata, common credential paths, private-key formats, dependency manifests/lockfiles, and protected paths such as `.github/`, `config/`, `infra/`, and `deploy/`. Caller-supplied protected paths can add restrictions but cannot remove built-in protections.
 - New files, deleted files, renames, copies, binary/combined diffs, submodules, mode changes, duplicate file sections, malformed hunks, and oversized patches.
 
 ## Important limitation
