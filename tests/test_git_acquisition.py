@@ -30,11 +30,11 @@ MANIFEST = validate_snapshot_manifest(
 )
 
 
-def _archive(*, sha256=ARCHIVE_SHA256, commit=COMMIT, manifest_sha256=MANIFEST.sha256, size=len(CONTENT), files=None):
+def _archive(*, sha256=ARCHIVE_SHA256, commit=COMMIT, manifest_sha256=MANIFEST.sha256, size=len(CONTENT), bytes_read=1024, files=None):
     return ArchiveInspection(
         commit=commit,
         manifest_sha256=manifest_sha256,
-        bytes_read=1024,
+        bytes_read=bytes_read,
         total_file_bytes=size,
         files=tuple(files) if files is not None else (ArchiveFileDigest("src/app.py", size, sha256),),
     )
@@ -116,6 +116,11 @@ def test_rejects_invalid_timeout(verified_inspection):
 def test_rejects_non_sha256_archive_digest(verified_inspection):
     with pytest.raises(GitAcquisitionError, match="full lowercase SHA-256"):
         _acquire(archive_inspection=_archive(sha256="not-a-digest"))
+
+
+def test_rejects_archive_byte_count_smaller_than_file_total(verified_inspection):
+    with pytest.raises(GitAcquisitionError, match="smaller than its file content total"):
+        _acquire(archive_inspection=_archive(bytes_read=len(CONTENT) - 1))
 
 
 def test_rejects_archive_file_size_mismatch(verified_inspection):
