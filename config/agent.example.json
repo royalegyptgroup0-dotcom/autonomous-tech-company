@@ -7,11 +7,35 @@
   "workspace": "../.local-agent",
   "review_interval_minutes": 360,
   "projects": [
-    {"id": "autonomous-tech-company", "path": "C:/Users/yasse/Desktop/autonomous-tech-company", "enabled": true},
-    {"id": "octopusa", "path": "", "enabled": false},
-    {"id": "royal-media-player", "path": "", "enabled": false},
-    {"id": "royal-egypt-group", "path": "", "enabled": false},
-    {"id": "royal-egypt-agent", "path": "", "enabled": false},
-    {"id": "ceo-notes", "path": "", "enabled": false}
+    {
+      "id": "autonomous-tech-company",
+      "path": "",
+      "enabled": false
+    },
+    {
+      "id": "octopusa",
+      "path": "",
+      "enabled": false
+    },
+    {
+      "id": "royal-media-player",
+      "path": "",
+      "enabled": false
+    },
+    {
+      "id": "royal-egypt-group",
+      "path": "",
+      "enabled": false
+    },
+    {
+      "id": "royal-egypt-agent",
+      "path": "",
+      "enabled": false
+    },
+    {
+      "id": "ceo-notes",
+      "path": "",
+      "enabled": false
+    }
   ]
 }
