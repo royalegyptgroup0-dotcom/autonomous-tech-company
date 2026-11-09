@@ -56,7 +56,7 @@ def parse_ls_tree_output(
     max_entries: int = 500,
     max_total_bytes: int = 20_000_000,
 ) -> PinnedTreeMetadata:
-    """Parse `git ls-tree -r -l -z <full-commit> -- <exact-paths>` output.
+    """Parse \`git ls-tree -r -l -z <full-commit> -- <exact-paths>\` output.
 
     Only regular Git blobs are accepted. Every expected path must appear
     exactly once; unexpected entries, links, submodules, trees, malformed
@@ -101,10 +101,10 @@ def parse_ls_tree_output(
 
     if not output:
         raise GitTreePolicyError("Git tree output is empty")
-    if not output.endswith(b"\\0"):
+    if not output.endswith(b"\0"):
         raise GitTreePolicyError("Git tree output is missing its final NUL delimiter")
 
-    records = output[:-1].split(b"\\0")
+    records = output[:-1].split(b"\0")
     if len(records) != len(allowed) or len(records) > max_entries:
         raise GitTreePolicyError("Git tree entry count does not match the exact allowlist")
 
@@ -112,9 +112,9 @@ def parse_ls_tree_output(
     folded_seen: set[str] = set()
     total = 0
     for record in records:
-        if not record or b"\\t" not in record:
+        if not record or b"\t" not in record:
             raise GitTreePolicyError("Git tree record is malformed")
-        header, raw_path = record.split(b"\\t", 1)
+        header, raw_path = record.split(b"\t", 1)
         try:
             mode_b, type_b, oid_b, size_b = header.split(b" ")
             path = raw_path.decode("utf-8", errors="strict")
