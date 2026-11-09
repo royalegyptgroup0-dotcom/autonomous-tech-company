@@ -130,7 +130,7 @@ def test_bounded_runner_returns_small_stdout_without_shell(tmp_path):
         3,
         100,
     )
-    assert result == b"bounded\n"
+    assert result.replace(b"\r\n", b"\n") == b"bounded\n"
 
 
 def test_bounded_runner_rejects_stdout_overflow(tmp_path):
