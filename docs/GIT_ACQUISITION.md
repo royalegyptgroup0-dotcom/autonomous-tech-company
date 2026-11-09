@@ -2,7 +2,7 @@
 
 ## Implemented boundary
 
-\`local_agent/git_acquisition.py\` connects the existing read-only worktree
+`local_agent/git_acquisition.py` connects the existing read-only worktree
 inspector, pinned-tree parser, snapshot manifest validator and Git blob verifier.
 
 For one already-registered, clean worktree, the acquisition function:
@@ -10,19 +10,19 @@ For one already-registered, clean worktree, the acquisition function:
 1. Revalidates the source/candidate worktree relationship, exact origin, pinned
    HEAD, registration and clean status through the existing read-only inspector.
 2. Resolves the full pinned commit and confirms the repository object format.
-3. Uses a fixed \`git ls-tree --full-tree -r -l -z\` command with literal pathspecs
+3. Uses a fixed `git ls-tree --full-tree -r -l -z` command with literal pathspecs
    for the exact configured allowlist.
 4. Parses the bounded NUL-delimited output, then independently validates the
    metadata against the snapshot manifest policy.
-5. Retrieves each blob by its full object ID using fixed \`git cat-file blob\`
+5. Retrieves each blob by its full object ID using fixed `git cat-file blob`
    commands. Each output is capped at the pinned file size plus one byte.
 6. Verifies the Git object ID and raw SHA-256 digest against the corresponding
    digest from a separately inspected archive stream.
 
-The default subprocess runner uses argv arrays with \`shell=False\`, no stdin,
+The default subprocess runner uses argv arrays with `shell=False`, no stdin,
 a filtered environment, disabled Git prompts, no system/global Git config,
-disabled replace refs and lazy fetching, strict per-command timeouts, a capped stdout stream, and stderr draining
-without retention. Proxy environment variables are not inherited.
+disabled replace refs and lazy fetching, strict per-command timeouts, a capped
+stdout stream, and stderr draining without retention. Proxy environment variables are not inherited.
 No remote/network Git subcommand is used.
 
 ## Required inputs and trust assumptions
@@ -31,9 +31,9 @@ No remote/network Git subcommand is used.
   registered-worktree inspector.
 - The full commit ID and exact origin must be supplied by trusted local config.
 - The path allowlist must be exact, bounded and safe.
-- The archive SHA-256 mapping must come from a completed bounded archive
-  inspection of the same intended snapshot. This module checks exact path-set
-  agreement and verifies every acquired blob against those digests.
+- The `ArchiveInspection` must come from a completed bounded archive inspection
+  of the same intended snapshot. Its pinned commit, manifest digest, file set,
+  file sizes and total byte accounting are checked before blob verification.
 
 ## Explicitly not implemented
 
