@@ -72,7 +72,7 @@ def verify_git_blob_stream(
 
     git_hash = hashlib.new(object_format)
     content_hash = hashlib.sha256()
-    git_hash.update(f"blob {expected_size}\\0".encode("ascii"))
+    git_hash.update(f"blob {expected_size}".encode("ascii") + bytes((0,)))
     remaining = expected_size
     while remaining:
         chunk = source.read(min(max_chunk_bytes, remaining))
