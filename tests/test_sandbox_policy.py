@@ -22,7 +22,7 @@ def test_profile_disables_network_and_host_redirections(tmp_path):
     assert root.findtext("PrinterRedirection") == "Disable"
     assert root.findtext("AudioInput") == "Disable"
     assert root.findtext("VideoInput") == "Disable"
-    assert root.findtext("vGPU") == "Disable"
+    assert root.findtext("VGpu") == "Disable"
     assert root.findtext("ProtectedClient") == "Enable"
     mapped = root.findall("./MappedFolders/MappedFolder")
     assert len(mapped) == 1
@@ -62,6 +62,16 @@ def test_rejects_missing_or_relative_paths(tmp_path):
         build_windows_sandbox_profile(tmp_path / "missing", source)
     with pytest.raises(SandboxPolicyError, match="absolute"):
         build_windows_sandbox_profile("relative-snapshot", source)
+
+
+def test_rejects_parent_directory_traversal(tmp_path):
+    source = tmp_path / "source"
+    snapshot = tmp_path / "snapshot"
+    source.mkdir()
+    snapshot.mkdir()
+    unsafe = tmp_path / "unused" / ".." / "snapshot"
+    with pytest.raises(SandboxPolicyError, match="traversal"):
+        build_windows_sandbox_profile(unsafe, source)
 
 
 def test_rejects_symlinked_snapshot_component(tmp_path):
