@@ -5,7 +5,11 @@ on:
   workflow_dispatch:
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     env:
       PYTHONPATH: .
     steps:
@@ -19,3 +23,20 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -m pytest -q
       - run: node --test tests/navigation.test.cjs
+
+      - name: Validate PowerShell script syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $scripts = Get-ChildItem scripts -Filter *.ps1
+          foreach ($script in $scripts) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              $script.FullName, [ref]$tokens, [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | Format-List
+              exit 1
+            }
+          }
