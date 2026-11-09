@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from local_agent.engine import (
-    AgentError, PROJECT_ID, _open_local_ollama, collect_snapshot, load_config,
+    AgentError, PROJECT_ID, _git_readonly, _open_local_ollama, collect_snapshot, load_config,
     local_ollama_base_url, safe_read,
 )
 
@@ -204,6 +204,49 @@ def test_config_accepts_utf8_bom_from_windows_powershell(tmp_path, monkeypatch):
     )
     config = load_config(config_path)
     assert config["enabled_projects"][0]["id"] == "sample-repo"
+
+
+def test_safe_read_blocks_git_metadata_and_common_credential_files(tmp_path: Path):
+    for relative in (
+        ".git/config",
+        ".git/hooks/pre-commit",
+        ".env.production",
+        "certs/private.pem",
+        "keys/signing.key",
+        ".npmrc",
+        ".netrc",
+    ):
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("sensitive material", encoding="utf-8")
+        assert safe_read(tmp_path, relative) == ""
+
+
+def test_git_readonly_disables_fsmonitor_and_strips_inherited_git_overrides(tmp_path, monkeypatch):
+    captured = {}
+
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        captured["env"] = kwargs["env"]
+        return SimpleNamespace(stdout=str(tmp_path))
+
+    monkeypatch.setenv("GIT_DIR", str(tmp_path / "attacker.git"))
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "core.fsmonitor")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "malicious-hook")
+    monkeypatch.setattr("local_agent.engine.subprocess.run", fake_run)
+
+    _git_readonly(tmp_path, "status", "--short", "--branch")
+
+    assert captured["command"][:6] == [
+        "git", "-c", "core.fsmonitor=false",
+        "-c", "core.untrackedCache=false", "-C", str(tmp_path),
+    ]
+    assert captured["env"]["GIT_CONFIG_NOSYSTEM"] == "1"
+    assert captured["env"]["GIT_TERMINAL_PROMPT"] == "0"
+    assert not any(key.upper().startswith("GIT_") and key != "GIT_CONFIG_NOSYSTEM"
+                   and key != "GIT_TERMINAL_PROMPT" for key in captured["env"])
+
 
 def test_safe_read_rejects_symlink_escape(tmp_path: Path):
     root = tmp_path / "repo"
