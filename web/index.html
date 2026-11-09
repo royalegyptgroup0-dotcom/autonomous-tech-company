@@ -1,42 +1,97 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Independent software, automation and AI systems company.">
-  <meta name="theme-color" content="#101827">
-  <title>Technology Company | Software · Automation · AI</title>
+  <meta name="description" content="Independent technology company building intelligent software, automation systems and practical AI for modern operations.">
+  <meta name="theme-color" content="#080d18">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Independent Technology Company">
+  <meta property="og:description" content="Software engineering, intelligent automation and applied AI systems.">
+  <title>Independent Technology Company — Software, Automation & AI</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="topbar">
-    <a class="brand" href="#" aria-label="Company home"><span class="mark">◆</span><span>YOUR COMPANY<span class="sub">TECHNOLOGY & INTELLIGENCE</span></span></a>
-    <nav><a href="#services">Services</a><a href="#platform">Platform</a><a href="#approach">Our approach</a><a class="nav-cta" href="#contact">Discuss a project</a></nav>
+  <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
+  <header class="site-header">
+    <a class="identity" href="#home" aria-label="Home">
+      <span class="identity-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="identity-copy"><strong>INDEPENDENT</strong><small>TECHNOLOGY COMPANY</small></span>
+    </a>
+    <button class="menu-toggle" aria-label="Open navigation" aria-expanded="false" aria-controls="primary-nav"><span></span><span></span></button>
+    <nav id="primary-nav" class="primary-nav" aria-label="Main navigation">
+      <a href="#capabilities">Capabilities</a><a href="#systems">Systems</a><a href="#method">Method</a><a href="#principles">Principles</a>
+      <a class="nav-contact" href="#contact">Start a project <span>↗</span></a>
+    </nav>
   </header>
-  <main>
-    <section class="hero">
-      <div class="eyebrow">INDEPENDENT TECHNOLOGY COMPANY</div>
-      <h1>Build smarter.<br><em>Operate better.</em></h1>
-      <p class="lead">We design practical software, intelligent automation and AI-powered business systems that turn complex work into clear, reliable operations.</p>
-      <div class="actions"><a class="button primary" href="#contact">Start a conversation</a><a class="button secondary" href="#services">Explore capabilities</a></div>
-      <div class="hero-note"><span></span> Human accountability. Measurable outcomes. Responsible AI.</div>
+
+  <main id="home">
+    <section class="hero shell">
+      <div class="hero-copy">
+        <div class="kicker"><span class="pulse"></span> ENGINEERING WHAT'S NEXT</div>
+        <h1>Technology that<br><em>moves business</em><br>forward.</h1>
+        <p class="hero-intro">We engineer intelligent software, connected workflows and applied AI systems that make complex operations simpler, faster and more dependable.</p>
+        <div class="hero-actions"><a class="button button-primary" href="#contact">Discuss a challenge <span>↗</span></a><a class="text-link" href="#capabilities">Explore our capabilities <span>↓</span></a></div>
+        <div class="hero-proof"><span class="proof-line"></span><span>Independent by design</span><span class="proof-dot">·</span><span>Human-accountable AI</span><span class="proof-dot">·</span><span>Built for measurable outcomes</span></div>
+      </div>
+      <div class="hero-visual" aria-label="Abstract digital systems illustration">
+        <div class="visual-grid"></div><div class="visual-ring ring-a"></div><div class="visual-ring ring-b"></div><div class="visual-ring ring-c"></div>
+        <div class="visual-core"><div class="core-glyph">∴</div><span>INTELLIGENCE<br>IN MOTION</span></div>
+        <div class="visual-tag tag-top"><span class="tag-dot"></span> SYSTEMS / 001</div><div class="visual-tag tag-bottom">SIGNAL → ACTION → IMPACT</div>
+        <div class="orbit-node node-a"></div><div class="orbit-node node-b"></div><div class="orbit-node node-c"></div>
+      </div>
+      <div class="hero-index"><span>01</span><span>—</span><span>BUILD WITH INTENT</span></div>
     </section>
-    <section class="section" id="services">
-      <div class="section-head"><div class="eyebrow">WHAT WE BUILD</div><h2>Technology that does useful work.</h2></div>
-      <div class="cards">
-        <article><b>01 / SOFTWARE</b><h3>Business software</h3><p>Web applications, internal tools, portals and connected data workflows built around real operating needs.</p></article>
-        <article><b>02 / AUTOMATION</b><h3>Workflow automation</h3><p>Reduce repetitive work with dependable integrations, approvals, notifications and process orchestration.</p></article>
-        <article><b>03 / INTELLIGENCE</b><h3>AI assistants & agents</h3><p>Purpose-built AI assistants with defined tools, permissions, monitoring and human escalation.</p></article>
+
+    <section class="capabilities section-pad" id="capabilities">
+      <div class="section-heading shell"><div><div class="kicker">01 / CAPABILITIES</div><h2>From difficult problems<br>to <em>working systems.</em></h2></div><p>We bring engineering, automation and intelligence together around the work that matters.</p></div>
+      <div class="capability-grid shell">
+        <article class="capability-card"><div class="card-top"><span>01</span><span class="card-icon">⌘</span></div><h3>Software engineering</h3><p>Web platforms, business applications, internal tools and secure APIs shaped around real operational needs.</p><a href="#contact" aria-label="Discuss software engineering">Explore capability <span>↗</span></a></article>
+        <article class="capability-card featured"><div class="card-top"><span>02</span><span class="card-icon">⟲</span></div><h3>Intelligent automation</h3><p>Connected workflows, integrations, approvals and orchestration that reduce repetitive work without losing control.</p><a href="#contact" aria-label="Discuss intelligent automation">Explore capability <span>↗</span></a></article>
+        <article class="capability-card"><div class="card-top"><span>03</span><span class="card-icon">✳</span></div><h3>Applied AI systems</h3><p>Purpose-built assistants and agents with clear permissions, human oversight, monitoring and measurable objectives.</p><a href="#contact" aria-label="Discuss applied AI">Explore capability <span>↗</span></a></article>
+        <article class="capability-card"><div class="card-top"><span>04</span><span class="card-icon">⌁</span></div><h3>Digital infrastructure</h3><p>Practical cloud, data and integration foundations designed for reliability, security and sustainable growth.</p><a href="#contact" aria-label="Discuss digital infrastructure">Explore capability <span>↗</span></a></article>
       </div>
     </section>
-    <section class="platform" id="platform">
-      <div><div class="eyebrow">THE LONG-TERM VISION</div><h2>A connected operating layer for business.</h2><p>Our platform direction brings projects, workflows, customer operations and AI agents into one governed environment. We will release capabilities incrementally, based on validated customer demand.</p></div>
-      <div class="orbit"><div class="orbit-core">COMPANY<br>OS</div><span>PEOPLE</span><span>WORKFLOWS</span><span>DATA</span><span>AI AGENTS</span></div>
+
+    <section class="systems-section section-pad" id="systems">
+      <div class="systems-layout shell">
+        <div class="systems-copy"><div class="kicker">02 / SYSTEMS THINKING</div><h2>Not isolated tools.<br><em>Connected capability.</em></h2><p>Useful technology is more than a collection of features. We design the links between people, data, decisions and execution—so every component has a clear role.</p><a class="text-link" href="#method">How we approach delivery <span>↗</span></a></div>
+        <div class="systems-diagram" role="img" aria-label="People, data, workflows and AI agents connected through a governed systems core">
+          <div class="diagram-orbit orbit-outer"></div><div class="diagram-orbit orbit-inner"></div>
+          <div class="diagram-core"><span>CORE</span><strong>CONTROL<br>& INTELLIGENCE</strong></div>
+          <div class="diagram-node people"><b>01</b><span>PEOPLE</span></div><div class="diagram-node data"><b>02</b><span>DATA</span></div><div class="diagram-node workflows"><b>03</b><span>WORKFLOWS</span></div><div class="diagram-node agents"><b>04</b><span>AI AGENTS</span></div>
+          <div class="diagram-caption">A GOVERNED, CONNECTED OPERATING LAYER</div>
+        </div>
+      </div>
     </section>
-    <section class="section approach" id="approach"><div class="eyebrow">HOW WE WORK</div><h2>Start focused. Prove value. Scale responsibly.</h2><div class="steps"><div><strong>01</strong><h3>Understand</h3><p>Map the problem, constraints and success measures.</p></div><div><strong>02</strong><h3>Deliver</h3><p>Build the smallest secure solution that creates value.</p></div><div><strong>03</strong><h3>Improve</h3><p>Measure outcomes, maintain the system and expand what works.</p></div></div></section>
-    <section class="contact" id="contact"><div><div class="eyebrow">LET'S TALK</div><h2>What should work better?</h2><p>Tell us about the process, product or challenge you want to improve.</p></div><a class="button primary" href="mailto:hello@example.com?subject=Project%20enquiry">Email the team</a></section>
+
+    <section class="method section-pad" id="method">
+      <div class="section-heading shell"><div><div class="kicker">03 / DELIVERY METHOD</div><h2>Start focused.<br><em>Scale what works.</em></h2></div><p>We favour evidence over assumptions and useful delivery over unnecessary complexity.</p></div>
+      <div class="method-steps shell">
+        <article><span class="step-number">01</span><div><h3>Discover</h3><p>Understand the operating context, constraints, users and definition of success.</p></div></article>
+        <article><span class="step-number">02</span><div><h3>Engineer</h3><p>Build the smallest secure solution that solves the right problem and can be maintained.</p></div></article>
+        <article><span class="step-number">03</span><div><h3>Validate</h3><p>Test with real workflows, measure outcomes and refine based on evidence.</p></div></article>
+        <article><span class="step-number">04</span><div><h3>Expand</h3><p>Turn proven capabilities into repeatable systems and products when demand is clear.</p></div></article>
+      </div>
+    </section>
+
+    <section class="principles section-pad" id="principles">
+      <div class="principles-inner shell"><div><div class="kicker">04 / OPERATING PRINCIPLES</div><h2>Ambition, with<br><em>accountability.</em></h2></div>
+        <div class="principle-list"><div><span>01</span><p><strong>Human accountability</strong> — consequential decisions remain reviewable and under authorised human control.</p></div><div><span>02</span><p><strong>Security by design</strong> — least privilege, data minimisation and auditable operations from the start.</p></div><div><span>03</span><p><strong>Open and efficient</strong> — favour open standards, proven tools and cost-conscious architecture.</p></div><div><span>04</span><p><strong>Value before scale</strong> — validate customer needs before adding complexity or building speculative platforms.</p></div></div>
+      </div>
+    </section>
+
+    <section class="contact-section shell" id="contact">
+      <div class="contact-panel"><div class="kicker">05 / THE NEXT STEP</div><h2>Every meaningful system<br>starts with a <em>real problem.</em></h2><p>Tell us what slows your operation down, what you want to build, or where technology should create a better outcome.</p><div class="contact-status"><span class="status-dot"></span> Direct contact channel is being finalised.</div></div>
+      <div class="contact-side"><div class="contact-symbol">↗</div><span>PROJECT ENQUIRIES</span><p>Our official business identity and contact details will be published once the company name and business channel are confirmed.</p><a href="https://github.com/royalegyptgroup0-dotcom/autonomous-tech-company" target="_blank" rel="noopener noreferrer">View engineering repository <span>↗</span></a></div>
+    </section>
   </main>
-  <footer><span>© <span id="year"></span> YOUR COMPANY</span><span>Independent · Responsible · Built for outcomes</span></footer>
-  <script src="app.js"></script>
+
+  <footer class="site-footer"><a class="footer-brand" href="#home">INDEPENDENT <span>/ TECHNOLOGY COMPANY</span></a><span>Engineering with intent. Operating with accountability.</span><a href="#home" class="back-top">BACK TO TOP ↑</a></footer>
+  <script src="app.js" defer></script>
 </body>
 </html>
