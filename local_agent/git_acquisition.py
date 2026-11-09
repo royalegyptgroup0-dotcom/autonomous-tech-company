@@ -14,8 +14,9 @@ import shutil
 import subprocess
 from threading import Event, Thread
 from time import monotonic
-from typing import Callable, Mapping, Sequence
+from typing import Callable, Sequence
 
+from .archive_policy import ArchiveInspection
 from .git_blob_policy import GitBlobVerification, verify_git_blob_stream
 from .git_inspector import GitInspection, inspect_registered_worktree
 from .git_tree_policy import PinnedTreeMetadata, parse_ls_tree_output
@@ -37,7 +38,6 @@ Runner = Callable[[list[str], Path, dict[str, str], int, int], bytes]
 _HEX_COMMIT = re.compile(r"^[0-9a-f]{40,64}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _MAX_TREE_OUTPUT = 2_000_000
-_MAX_STDERR_BYTES = 16_384
 
 
 def _safe_git_environment() -> dict[str, str]:
@@ -86,7 +86,6 @@ def _run_git_bounded(
     assert process.stdout is not None
     assert process.stderr is not None
     output_parts: list[bytes] = []
-    stderr_parts: list[bytes] = []
     output_size = 0
     overflow = Event()
 
@@ -103,15 +102,8 @@ def _run_git_bounded(
             output_parts.append(chunk)
 
     def drain_stderr() -> None:
-        retained = 0
-        while True:
-            chunk = process.stderr.read(4096)
-            if not chunk:
-                return
-            if retained < _MAX_STDERR_BYTES:
-                piece = chunk[: _MAX_STDERR_BYTES - retained]
-                stderr_parts.append(piece)
-                retained += len(piece)
+        while process.stderr.read(4096):
+            pass
 
     out_thread = Thread(target=drain_stdout, daemon=True)
     err_thread = Thread(target=drain_stderr, daemon=True)
@@ -161,7 +153,7 @@ def acquire_and_verify_pinned_blobs(
     expected_origin: str,
     pinned_commit: str,
     allowed_paths: Sequence[str],
-    archive_sha256_by_path: Mapping[str, str],
+    archive_inspection: ArchiveInspection,
     timeout_seconds: int = 10,
     _runner: Runner | None = None,
     _inspection_runner=None,
@@ -191,12 +183,15 @@ def acquire_and_verify_pinned_blobs(
             raise GitAcquisitionError("Allowed paths contain duplicates or Windows case collisions")
         safe_paths.append(safe_path)
         folded_paths.add(safe_path.casefold())
-    if not isinstance(archive_sha256_by_path, Mapping):
-        raise GitAcquisitionError("Archive SHA-256 values must be a path-to-digest mapping")
-    if set(archive_sha256_by_path) != set(safe_paths):
-        raise GitAcquisitionError("Archive digest paths must exactly match the requested allowlist")
-    if any(not isinstance(value, str) or not _SHA256.fullmatch(value) for value in archive_sha256_by_path.values()):
-        raise GitAcquisitionError("Every archive digest must be a full lowercase SHA-256 value")
+    if not isinstance(archive_inspection, ArchiveInspection):
+        raise GitAcquisitionError("A completed bounded archive inspection is required")
+    if archive_inspection.commit != pinned_commit:
+        raise GitAcquisitionError("Archive inspection commit differs from the pinned commit")
+    archive_files = {item.path: item for item in archive_inspection.files}
+    if len(archive_files) != len(archive_inspection.files) or set(archive_files) != set(safe_paths):
+        raise GitAcquisitionError("Archive inspection files must exactly match the requested allowlist")
+    if any(not isinstance(item.sha256, str) or not _SHA256.fullmatch(item.sha256) for item in archive_files.values()):
+        raise GitAcquisitionError("Every archive file must contain a full lowercase SHA-256 digest")
 
     inspection = inspect_registered_worktree(
         source_checkout,
@@ -260,6 +255,12 @@ def acquire_and_verify_pinned_blobs(
         raise GitAcquisitionError("Pinned tree did not satisfy the snapshot manifest policy") from exc
     if manifest.total_bytes != tree.total_bytes:
         raise GitAcquisitionError("Pinned tree and snapshot manifest byte totals differ")
+    if archive_inspection.manifest_sha256 != manifest.sha256:
+        raise GitAcquisitionError("Archive inspection manifest digest does not match the pinned tree")
+    if archive_inspection.total_file_bytes != manifest.total_bytes:
+        raise GitAcquisitionError("Archive inspection byte total does not match the pinned tree")
+    if any(archive_files[item.path].size_bytes != item.size_bytes for item in tree.entries):
+        raise GitAcquisitionError("Archive file size does not match the pinned Git tree")
 
     verified: list[GitBlobVerification] = []
     for entry in tree.entries:
@@ -272,7 +273,7 @@ def acquire_and_verify_pinned_blobs(
                 path=entry.path,
                 expected_size=entry.size_bytes,
                 expected_git_oid=entry.object_id,
-                expected_sha256=archive_sha256_by_path[entry.path],
+                expected_sha256=archive_files[entry.path].sha256,
                 object_format=object_format,
             )
         except ValueError as exc:
