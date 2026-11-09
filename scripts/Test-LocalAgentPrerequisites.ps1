@@ -60,4 +60,32 @@ if (Get-Command ollama -ErrorAction SilentlyContinue) {
 }
 
 Write-Host ""
-Write-Host "This check is advisory. It does not guarantee model compatibility or run the engineering agent."
+Write-Host "Windows Sandbox capability (read-only):"
+try {
+    $os = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
+    Write-Host ("Windows edition: {0}" -f $os.Caption)
+    $system = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
+    Write-Host ("Hypervisor present: {0}" -f $system.HypervisorPresent)
+    $processor = Get-CimInstance Win32_Processor -ErrorAction Stop | Select-Object -First 1
+    Write-Host ("Firmware virtualization enabled: {0}" -f $processor.VirtualizationFirmwareEnabled)
+} catch {
+    Write-Host "[UNKNOWN] Could not inspect virtualization prerequisites: $($_.Exception.Message)" -ForegroundColor Yellow
+}
+
+$featureQuery = Get-Command Get-WindowsOptionalFeature -ErrorAction SilentlyContinue
+if ($featureQuery) {
+    try {
+        $sandboxFeature = Get-WindowsOptionalFeature -Online -FeatureName Containers-DisposableClientVM -ErrorAction Stop
+        Write-Host ("Windows Sandbox optional feature: {0}" -f $sandboxFeature.State)
+        if ($sandboxFeature.State -ne "Enabled") {
+            Write-Host "CAUTION: Windows Sandbox is not enabled. This checker will not enable it." -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "[UNKNOWN] Windows Sandbox feature state could not be read (elevation or edition may limit access)." -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "[UNKNOWN] Get-WindowsOptionalFeature is unavailable; Sandbox capability was not verified." -ForegroundColor Yellow
+}
+
+Write-Host ""
+Write-Host "This check is advisory. It does not enable Windows features, guarantee model compatibility, launch Sandbox, or run the engineering agent."
