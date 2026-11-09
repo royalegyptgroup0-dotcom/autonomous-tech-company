@@ -99,7 +99,7 @@ def test_rejects_archive_digest_mismatch(verified_inspection):
 
 
 def test_rejects_archive_digest_path_set_mismatch_before_git(verified_inspection):
-    with pytest.raises(GitAcquisitionError, match="non-empty immutable"):
+    with pytest.raises(GitAcquisitionError, match="exactly match"):
         _acquire(archive_inspection=_archive(files=()))
 
 
