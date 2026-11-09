@@ -16,7 +16,7 @@ from threading import Event, Thread
 from time import monotonic
 from typing import Callable, Sequence
 
-from .archive_policy import ArchiveInspection
+from .archive_policy import ArchiveFileDigest, ArchiveInspection
 from .git_blob_policy import GitBlobVerification, verify_git_blob_stream
 from .git_inspector import GitInspection, inspect_registered_worktree
 from .git_tree_policy import PinnedTreeMetadata, parse_ls_tree_output
@@ -68,6 +68,8 @@ def _run_git_bounded(
     max_output_bytes: int,
 ) -> bytes:
     """Run fixed Git argv with bounded stdout, timeout and no shell."""
+    if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool) or not 1 <= timeout_seconds <= 30:
+        raise GitAcquisitionError("Git timeout is outside its safe bound")
     if not isinstance(max_output_bytes, int) or isinstance(max_output_bytes, bool) or not 1 <= max_output_bytes <= _MAX_TREE_OUTPUT:
         raise GitAcquisitionError("Git output limit is outside its safe bound")
     try:
@@ -83,8 +85,10 @@ def _run_git_bounded(
     except OSError as exc:
         raise GitAcquisitionError(f"Git command could not start: {type(exc).__name__}") from exc
 
-    assert process.stdout is not None
-    assert process.stderr is not None
+    if process.stdout is None or process.stderr is None:
+        process.kill()
+        process.wait()
+        raise GitAcquisitionError("Git output pipes could not be created")
     output_parts: list[bytes] = []
     output_size = 0
     overflow = Event()
@@ -160,9 +164,9 @@ def acquire_and_verify_pinned_blobs(
 ) -> GitAcquisitionResult:
     """Verify one exact allowlist of archive-inspected files against pinned Git blobs.
 
-    The archive digest mapping must come from a separately completed bounded
-    archive inspection of this same pinned snapshot. Test-only runners may be
-    injected by unit tests; production callers must use the built-in runner.
+    The archive inspection must be the completed bounded inspection of this
+    same pinned snapshot. Its manifest digest and exact file sizes are cross-checked.
+    Test-only runners may be injected; production uses the built-in runner.
     """
     if not isinstance(pinned_commit, str) or not _HEX_COMMIT.fullmatch(pinned_commit):
         raise GitAcquisitionError("A full lowercase pinned commit ID is required")
@@ -187,11 +191,31 @@ def acquire_and_verify_pinned_blobs(
         raise GitAcquisitionError("A completed bounded archive inspection is required")
     if archive_inspection.commit != pinned_commit:
         raise GitAcquisitionError("Archive inspection commit differs from the pinned commit")
-    archive_files = {item.path: item for item in archive_inspection.files}
-    if len(archive_files) != len(archive_inspection.files) or set(archive_files) != set(safe_paths):
+    if not isinstance(archive_inspection.bytes_read, int) or isinstance(archive_inspection.bytes_read, bool) or not 1 <= archive_inspection.bytes_read <= 32_000_000:
+        raise GitAcquisitionError("Archive inspection byte count is invalid")
+    if not isinstance(archive_inspection.total_file_bytes, int) or isinstance(archive_inspection.total_file_bytes, bool) or not 0 <= archive_inspection.total_file_bytes <= 20_000_000:
+        raise GitAcquisitionError("Archive inspection total file size is invalid")
+    if not isinstance(archive_inspection.manifest_sha256, str) or not _SHA256.fullmatch(archive_inspection.manifest_sha256):
+        raise GitAcquisitionError("Archive inspection manifest digest is invalid")
+    if not isinstance(archive_inspection.files, tuple) or not archive_inspection.files:
+        raise GitAcquisitionError("Archive inspection must contain a non-empty immutable file list")
+    archive_files: dict[str, ArchiveFileDigest] = {}
+    for item in archive_inspection.files:
+        if not isinstance(item, ArchiveFileDigest):
+            raise GitAcquisitionError("Archive inspection contains an invalid file digest record")
+        try:
+            archive_path = _safe_path(item.path, SnapshotLimits())
+        except SnapshotPolicyError as exc:
+            raise GitAcquisitionError("Archive inspection contains an unsafe path") from exc
+        if archive_path != item.path or archive_path in archive_files:
+            raise GitAcquisitionError("Archive inspection contains non-canonical or duplicate paths")
+        if not isinstance(item.size_bytes, int) or isinstance(item.size_bytes, bool) or not 0 <= item.size_bytes <= 2_000_000:
+            raise GitAcquisitionError("Archive inspection contains an invalid file size")
+        if not isinstance(item.sha256, str) or not _SHA256.fullmatch(item.sha256):
+            raise GitAcquisitionError("Every archive file must contain a full lowercase SHA-256 digest")
+        archive_files[archive_path] = item
+    if set(archive_files) != set(safe_paths):
         raise GitAcquisitionError("Archive inspection files must exactly match the requested allowlist")
-    if any(not isinstance(item.sha256, str) or not _SHA256.fullmatch(item.sha256) for item in archive_files.values()):
-        raise GitAcquisitionError("Every archive file must contain a full lowercase SHA-256 digest")
 
     inspection = inspect_registered_worktree(
         source_checkout,
