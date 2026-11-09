@@ -221,6 +221,7 @@ def validate_unified_diff(
                 if index >= len(block):
                     raise PatchPolicyError("Truncated unified-diff hunk")
                 line = block[index]
+                if not line:
                     raise PatchPolicyError("Malformed empty diff line")
                 marker = line[0]
                 if marker == " ":
