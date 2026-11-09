@@ -112,7 +112,7 @@ def test_enforces_output_entry_and_total_byte_limits():
 @pytest.mark.parametrize("value", ["sha1", ""])
 def test_rejects_string_as_expected_path_collection(value):
     with pytest.raises(GitTreePolicyError, match="collection"):
-        _parse(expected_paths=value)
+        _parse(paths=value)
 
 
 def test_rejects_non_bytes_output_and_invalid_object_format():
