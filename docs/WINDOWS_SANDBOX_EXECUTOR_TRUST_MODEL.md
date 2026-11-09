@@ -16,6 +16,35 @@ refuses cleanup when it cannot prove exact ownership.
 These are useful containment and integrity controls, but they do not establish
 that a test result returned by a guest is authentic.
 
+## Findings from the official Windows interfaces
+
+Microsoft documents two relevant command paths:
+
+- The native Windows Sandbox CLI (`wsb`) can execute a command and return its
+  exit code, but its documentation explicitly says process I/O is not supported,
+  so command stdout/stderr cannot be retrieved through that interface. It also
+  requires an active user session for commands running as the logged-in user.
+  See [Windows Sandbox command-line interface](https://learn.microsoft.com/en-us/windows/security/application-security/application-isolation/windows-sandbox/windows-sandbox-cli).
+- The Microsoft `winapp` Sandbox workflow can forward guest process streams,
+  but its documentation says apps and workflows share the same guest user,
+  desktop, registry, packages, runtimes and network access and can interfere
+  with each other. Its preparation also adds shared bootstrap folders, a guest
+  agent, Developer Mode and an inbound firewall rule. That is not an acceptable
+  default trust boundary for mutually untrusted test code in this project.
+  See [Windows Sandbox execution](https://learn.microsoft.com/en-us/windows/apps/dev-tools/winapp-cli/sandbox-execution).
+
+Microsoft also warns that changes to host folders mapped with write permission
+persist after the Sandbox is disposed, and documents that LogonCommand runs
+under the Sandbox container user, which should be an administrator account.
+Therefore, a writable mapped folder and a simple LogonCommand are not enough
+to establish a trusted report channel. See
+[Use and configure Windows Sandbox](https://learn.microsoft.com/en-us/windows/security/application-security/application-isolation/windows-sandbox/windows-sandbox-configure-using-wsb-file).
+
+These findings do not prove that no future solution exists. They do mean that
+the currently documented native CLI does not provide the required process
+output channel, while the alternative documented workflow has shared-user and
+network-related characteristics that need a separate security assessment.
+
 ## Critical result-channel problem
 
 A future guest bootstrap needs a way to return command results to the host.
