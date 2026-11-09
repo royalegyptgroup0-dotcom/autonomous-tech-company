@@ -118,6 +118,10 @@ def load_config(path: Path) -> dict[str, Any]:
         ).stdout.strip()
         if Path(git_root).resolve() != root:
             raise AgentError(f"Project path must be the repository root: {root}")
+        review_files = project.get("review_files", [])
+        if not isinstance(review_files, list) or any(not isinstance(item, str) or not item.strip() for item in review_files):
+            raise AgentError(f"review_files for {project_id} must be a list of non-empty relative path strings")
+        project["review_files"] = list(dict.fromkeys(item.strip() for item in review_files))
         project["resolved_path"] = root
         enabled.append(project)
     config["enabled_projects"] = enabled
@@ -190,7 +194,8 @@ def collect_snapshot(project: dict[str, Any]) -> str:
         if len(tree) >= 120:
             break
     sections = [f"PROJECT: {project['id']}", f"ROOT: {root}", f"GIT STATUS:\n{status or '(clean)'}", f"RECENT COMMITS:\n{history or '(none)'}", "SOURCE FILES:\n" + "\n".join(tree[:120])]
-    for name in SAFE_FILES:
+    review_files = list(dict.fromkeys((*SAFE_FILES, *project.get("review_files", []))))
+    for name in review_files:
         content = safe_read(root, name)
         if content:
             sections.append(f"--- {name} ---\n{content}")
