@@ -42,6 +42,8 @@ class PatchSummary:
 
 DEFAULT_PROTECTED_PATHS = (
     ".github/",
+    ".git/",
+    ".ssh/",
     ".env",
     "secrets/",
     "credentials/",
@@ -80,8 +82,14 @@ def _validate_path(path: str, limits: PatchLimits) -> str:
     parts = path.split("/")
     if any(part in ("", ".", "..") for part in parts):
         raise PatchPolicyError(f"Path traversal or non-canonical path: {path!r}")
-    if any(part.lower().startswith(".env") for part in parts):
-        raise PatchPolicyError("Environment files are protected")
+    blocked_names = {".git", ".ssh", ".npmrc", ".pypirc", ".netrc", "id_rsa", "id_ed25519"}
+    if any(
+        part.casefold() in blocked_names
+        or part.casefold().startswith(".env")
+        or part.casefold().endswith((".pem", ".key", ".p12", ".pfx", ".jks", ".keystore"))
+        for part in parts
+    ):
+        raise PatchPolicyError("Credential and private-key paths are protected")
     return path
 
 
@@ -233,6 +241,12 @@ def validate_unified_diff(
                 if old_remaining < 0 or new_remaining < 0:
                     raise PatchPolicyError("Hunk line counts exceed the declared ranges")
                 index += 1
+            no_newline_markers = 0
+            while index < len(block) and block[index].startswith("\\\\ No newline at end of file"):
+                no_newline_markers += 1
+                if no_newline_markers > 2:
+                    raise PatchPolicyError("Too many no-newline markers")
+                index += 1
             if additions + deletions > limits.max_changed_lines:
                 raise PatchPolicyError("Per-file changed-line limit exceeded")
 
@@ -243,6 +257,8 @@ def validate_unified_diff(
         total_deletions += deletions
         parsed.append(FilePatch(path, additions, deletions, hunk_count))
 
+    if total_additions + total_deletions == 0:
+        raise PatchPolicyError("Patch must contain at least one changed line")
     if total_additions + total_deletions > limits.max_changed_lines:
         raise PatchPolicyError("Total changed-line limit exceeded")
     return PatchSummary(
