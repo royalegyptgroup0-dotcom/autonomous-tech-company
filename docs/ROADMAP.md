@@ -24,3 +24,10 @@
 - Productize the most repeated paid workflow.
 - Add tenant isolation, billing integration only after legal and security review.
 - Measure retention and support cost before scaling.
+
+
+## Engineering autonomy — staged safety gates
+- Phase 1 (read-only local review): implementation and cross-platform CI are in place; local Windows + Ollama smoke test remains outstanding.
+- Phase 2 (bounded code changes): design only until a disposable worktree, strict patch validation, allowlisted tests, rollback, network isolation, audit trail and draft-only PR path are implemented and tested.
+- Phase 3 (continuous operation): do not enable a scheduled task until Phase 1 has passed on the actual Windows machine and the user has reviewed a local report.
+- No paid APIs, subscriptions, production writes or external side effects without explicit approval.
