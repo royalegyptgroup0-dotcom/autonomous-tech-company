@@ -118,3 +118,12 @@ def test_config_allows_dedicated_local_agent_workspace(tmp_path, monkeypatch):
     )
     config = load_config(config_path)
     assert config["workspace_path"] == workspace.resolve()
+
+
+
+def test_example_config_does_not_enable_unverified_paths():
+    example_path = Path(__file__).resolve().parents[1] / "config" / "agent.example.json"
+    example = json.loads(example_path.read_text(encoding="utf-8"))
+    assert example["projects"]
+    assert all(project["enabled"] is False for project in example["projects"])
+    assert all(project["path"] == "" for project in example["projects"])
