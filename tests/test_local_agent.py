@@ -131,7 +131,7 @@ def test_example_config_does_not_enable_unverified_paths():
 
 
 def test_config_rejects_invalid_review_file_allowlist(tmp_path, monkeypatch):
-    config_path, root = _write_agent_config(tmp_path, root_workspace := tmp_path / "outside")
+    config_path, root = _write_agent_config(tmp_path, tmp_path / "outside")
     config = json.loads(config_path.read_text(encoding="utf-8"))
     config["projects"][0]["review_files"] = "src/main.py"
     config_path.write_text(json.dumps(config), encoding="utf-8")
