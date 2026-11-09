@@ -48,6 +48,8 @@ def _existing_directory(path: str | os.PathLike[str], label: str) -> Path:
     raw = Path(path)
     if not raw.is_absolute():
         raise SnapshotBuildError(f"{label} must be an absolute path")
+    if any(part in (".", "..") for part in raw.parts[1:]):
+        raise SnapshotBuildError(f"{label} contains a non-canonical path component")
     current = Path(raw.anchor)
     for part in raw.parts[1:]:
         current = current / part
@@ -292,7 +294,12 @@ def cleanup_disposable_snapshot(result: SnapshotBuildResult) -> None:
         raise SnapshotBuildError("Snapshot ownership commit is invalid")
     if not isinstance(result.manifest_sha256, str) or len(result.manifest_sha256) != 64:
         raise SnapshotBuildError("Snapshot ownership manifest digest is invalid")
-    for path in result.files:
-        if _safe_path(path, SnapshotLimits()) != path:
-            raise SnapshotBuildError("Snapshot ownership receipt contains an unsafe path")
+    if not 1 <= len(result.files) <= 500 or len(set(result.files)) != len(result.files):
+        raise SnapshotBuildError("Snapshot ownership receipt file list is invalid")
+    if any(_safe_path(path, SnapshotLimits()) != path for path in result.files):
+        raise SnapshotBuildError("Snapshot ownership receipt contains an unsafe path")
+    if any(char not in "0123456789abcdef" for char in result.commit):
+        raise SnapshotBuildError("Snapshot ownership commit is invalid")
+    if any(char not in "0123456789abcdef" for char in result.manifest_sha256):
+        raise SnapshotBuildError("Snapshot ownership manifest digest is invalid")
     _remove_owned(root, result.owner_token, result.commit, result.manifest_sha256, result.files)
