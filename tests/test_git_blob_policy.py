@@ -50,7 +50,12 @@ def test_rejects_archive_digest_mismatch():
 
 def test_rejects_truncated_and_oversized_streams():
     with pytest.raises(GitBlobPolicyError, match="ended"):
-        _verify(content=CONTENT[:-1])
+        _verify(
+            content=CONTENT[:-1],
+            expected_size=len(CONTENT),
+            expected_git_oid=_git_oid(CONTENT, "sha1"),
+            expected_sha256=hashlib.sha256(CONTENT).hexdigest(),
+        )
     with pytest.raises(GitBlobPolicyError, match="beyond"):
         _verify(content=CONTENT + b"x")
 
