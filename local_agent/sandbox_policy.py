@@ -31,11 +31,14 @@ _SANDBOX_FOLDER = r"C:\Validation"
 
 def _absolute_existing_directory(value: str | os.PathLike[str], label: str) -> Path:
     try:
-        candidate = Path(os.path.abspath(os.fspath(value)))
+        raw = Path(os.fspath(value))
     except (TypeError, ValueError, OSError) as exc:
         raise SandboxPolicyError(f"{label} must be a valid path") from exc
-    if not candidate.is_absolute():
+    if not raw.is_absolute():
         raise SandboxPolicyError(f"{label} must be absolute")
+    if any(part == ".." for part in raw.parts):
+        raise SandboxPolicyError(f"{label} cannot contain parent-directory traversal")
+    candidate = Path(os.path.normpath(os.fspath(raw)))
 
     current = Path(candidate.anchor)
     for part in candidate.parts[1:]:
@@ -74,7 +77,7 @@ def build_windows_sandbox_profile(
 
     root = ET.Element("Configuration")
     for tag, value in (
-        ("vGPU", "Disable"),
+        ("VGpu", "Disable"),
         ("Networking", "Disable"),
         ("ClipboardRedirection", "Disable"),
         ("PrinterRedirection", "Disable"),
