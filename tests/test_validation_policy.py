@@ -52,7 +52,7 @@ def test_rejects_extra_registry_keys():
 
 @pytest.mark.parametrize("argv", [
     [],
-    ["python", "bad\\nargument"],
+    ["python", "bad\nargument"],
     ["python", "x" * 4097],
     ["python", *([ "x" ] * 64)],
 ])
