@@ -45,7 +45,9 @@ def test_builds_exact_snapshot_and_cleanup_removes_only_owned_tree(tmp_path):
     result = build_disposable_snapshot(acquisition(), validation_parent=parent, source_checkout=source)
     assert result.path.parent == parent
     assert (result.path / "src" / "app.py").read_bytes() == CONTENT
-    assert (result.path / ".agent-snapshot-owner.json").is_file()
+    marker = result.path / ".agent-snapshot-owner.json"
+    assert marker.is_file()
+    assert result.owner_token not in marker.read_text(encoding="utf-8")
     cleanup_disposable_snapshot(result)
     assert not result.path.exists()
     assert source.is_dir()
