@@ -204,3 +204,15 @@ def test_config_accepts_utf8_bom_from_windows_powershell(tmp_path, monkeypatch):
     )
     config = load_config(config_path)
     assert config["enabled_projects"][0]["id"] == "sample-repo"
+
+def test_safe_read_rejects_symlink_escape(tmp_path: Path):
+    root = tmp_path / "repo"
+    root.mkdir()
+    outside = tmp_path / "outside.txt"
+    outside.write_text("outside secret", encoding="utf-8")
+    link = root / "linked.txt"
+    try:
+        link.symlink_to(outside)
+    except (OSError, NotImplementedError):
+        pytest.skip("Symlink creation is not permitted on this host")
+    assert safe_read(root, "linked.txt") == ""
