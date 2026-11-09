@@ -129,6 +129,8 @@ def validate_unified_diff(
     if "\x00" in patch:
         raise PatchPolicyError("Binary or NUL-containing patch content is not allowed")
 
+    if isinstance(allowed_paths, (str, bytes)):
+        raise PatchPolicyError("allowed_paths must be a collection of exact path strings, not one string")
     allow = {
         _validate_path(item, limits)
         for item in allowed_paths
