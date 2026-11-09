@@ -6,7 +6,7 @@ A free-first, Windows-native, local agent that remains available while the PC is
 
 ## Hardware profile
 
-Initial target: Windows + 16 GB RAM, GPU unknown. Start with qwen2.5-coder:3b (about 1.9 GB in the Ollama library) and CPU fallback. Do not download a larger model until GPU/VRAM and available memory are checked. Ollama runs natively on Windows and exposes its local API at http://localhost:11434.
+Initial target: Windows + 16 GB RAM, GPU unknown. Start with qwen3.5:4b (about 4 GB model download) and CPU fallback. This model is published under Apache-2.0. If CPU speed or available memory is insufficient, switch to qwen3.5:2b. Do not download a larger model until GPU/VRAM and available memory are checked. Ollama runs natively on Windows and exposes its local API at http://localhost:11434.
 
 ## Phase 1 delivered here
 
@@ -21,7 +21,7 @@ Initial target: Windows + 16 GB RAM, GPU unknown. Start with qwen2.5-coder:3b (a
 ## Setup
 
 1. Install Ollama for Windows from https://ollama.com/download/windows.
-2. In PowerShell, run: ollama pull qwen2.5-coder:3b
+2. In PowerShell, run: ollama pull qwen3.5:4b
 3. Copy config/agent.example.json to config/agent.local.json.
 4. Add local repository paths. Enable only projects whose repository roots you have verified. Each project must be a separate, non-overlapping Git root.
 5. Run: python local_agent/engine.py --config config/agent.local.json --check
