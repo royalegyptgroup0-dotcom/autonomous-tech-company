@@ -16,7 +16,7 @@ import stat
 import tempfile
 from typing import Iterable
 
-from .git_acquisition import GitAcquisitionResult
+from .git_acquisition import GitAcquisitionResult, VerifiedBlobContent
 from .snapshot_policy import SnapshotLimits, _safe_path
 
 
@@ -27,17 +27,6 @@ class SnapshotBuildError(ValueError):
 _MARKER = ".agent-snapshot-owner.json"
 _MARKER_VERSION = 1
 _REPARSE_ATTRIBUTE = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
-
-
-@dataclass(frozen=True)
-class VerifiedBlobContent:
-    """Immutable bytes retained only after pinned Git and archive digest checks."""
-    path: str
-    content: bytes
-    size_bytes: int
-    git_object_id: str
-    object_format: str
-    sha256: str
 
 
 @dataclass(frozen=True)
@@ -90,7 +79,7 @@ def _verified_payload(acquisition: GitAcquisitionResult) -> tuple[str, str, tupl
     if not isinstance(acquisition, GitAcquisitionResult):
         raise SnapshotBuildError("A completed trusted Git acquisition result is required")
     tree = acquisition.tree
-    commit = getattr(tree, "commit", None)
+    commit = getattr(acquisition, "pinned_commit", None)
     manifest_sha256 = getattr(acquisition, "manifest_sha256", None)
     if not isinstance(commit, str) or len(commit) not in (40, 64) or any(c not in "0123456789abcdef" for c in commit):
         raise SnapshotBuildError("Acquisition result has no full pinned commit")
@@ -105,8 +94,10 @@ def _verified_payload(acquisition: GitAcquisitionResult) -> tuple[str, str, tupl
         raise SnapshotBuildError("Verified content does not exactly match the pinned tree")
     by_path: dict[str, VerifiedBlobContent] = {}
     verify_by_path = {item.path: item for item in verifications}
-    if len(verify_by_path) != len(verifications):
-        raise SnapshotBuildError("Duplicate Git verification records")
+    if len(verify_by_path) != len(verifications) or set(verify_by_path) != {item.path for item in entries}:
+        raise SnapshotBuildError("Git verification records do not exactly match the pinned tree")
+    if getattr(tree, "object_format", None) not in ("sha1", "sha256"):
+        raise SnapshotBuildError("Pinned tree object format is invalid")
     total = 0
     for blob in blobs:
         if not isinstance(blob, VerifiedBlobContent):
@@ -116,7 +107,7 @@ def _verified_payload(acquisition: GitAcquisitionResult) -> tuple[str, str, tupl
             raise SnapshotBuildError("Blob path or content is invalid")
         if not isinstance(blob.size_bytes, int) or isinstance(blob.size_bytes, bool) or blob.size_bytes != len(blob.content) or blob.size_bytes > 2_000_000:
             raise SnapshotBuildError("Blob content size is invalid")
-        if blob.object_format not in ("sha1", "sha256"):
+        if blob.object_format not in ("sha1", "sha256") or blob.object_format != tree.object_format:
             raise SnapshotBuildError("Blob Git object format is invalid")
         git_hash = hashlib.new(blob.object_format)
         git_hash.update(f"blob {blob.size_bytes}".encode("ascii") + bytes((0,)))
@@ -135,6 +126,8 @@ def _verified_payload(acquisition: GitAcquisitionResult) -> tuple[str, str, tupl
     tree_by_path = {item.path: item for item in entries}
     if len(tree_by_path) != len(entries) or set(tree_by_path) != set(by_path):
         raise SnapshotBuildError("Verified content paths differ from the pinned Git tree")
+    if total != getattr(tree, "total_bytes", None):
+        raise SnapshotBuildError("Verified content total differs from pinned tree metadata")
     for path, entry in tree_by_path.items():
         blob = by_path[path]
         if entry.object_id != blob.git_object_id or entry.size_bytes != blob.size_bytes:
@@ -292,6 +285,14 @@ def cleanup_disposable_snapshot(result: SnapshotBuildResult) -> None:
     if not isinstance(result, SnapshotBuildResult):
         raise SnapshotBuildError("A snapshot ownership receipt is required")
     root = Path(result.path)
-    if not root.is_absolute() or root.name != root.name or not result.owner_token or len(result.owner_token) != 64:
+    if (not root.is_absolute() or not isinstance(result.owner_token, str) or len(result.owner_token) != 64
+            or any(char not in "0123456789abcdef" for char in result.owner_token) or not isinstance(result.files, tuple)):
         raise SnapshotBuildError("Snapshot ownership receipt is invalid")
+    if not isinstance(result.commit, str) or len(result.commit) not in (40, 64):
+        raise SnapshotBuildError("Snapshot ownership commit is invalid")
+    if not isinstance(result.manifest_sha256, str) or len(result.manifest_sha256) != 64:
+        raise SnapshotBuildError("Snapshot ownership manifest digest is invalid")
+    for path in result.files:
+        if _safe_path(path, SnapshotLimits()) != path:
+            raise SnapshotBuildError("Snapshot ownership receipt contains an unsafe path")
     _remove_owned(root, result.owner_token, result.commit, result.manifest_sha256, result.files)
