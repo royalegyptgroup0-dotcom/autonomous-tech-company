@@ -137,7 +137,12 @@ def load_config(path: Path) -> dict[str, Any]:
         review_files = project.get("review_files", [])
         if not isinstance(review_files, list) or any(not isinstance(item, str) or not item.strip() for item in review_files):
             raise AgentError(f"review_files for {project_id} must be a list of non-empty relative path strings")
-        project["review_files"] = list(dict.fromkeys(item.strip() for item in review_files))
+        normalized_review_files = list(dict.fromkeys(item.strip() for item in review_files))
+        if len(normalized_review_files) > 50:
+            raise AgentError(f"review_files for {project_id} may contain at most 50 paths")
+        if any(len(item) > 512 for item in normalized_review_files):
+            raise AgentError(f"review_files for {project_id} contains a path longer than 512 characters")
+        project["review_files"] = normalized_review_files
         project["resolved_path"] = root
         enabled.append(project)
     config["enabled_projects"] = enabled
@@ -211,29 +216,47 @@ def safe_read(root: Path, relative: str, limit: int = 12000) -> str:
 
 def collect_snapshot(project: dict[str, Any]) -> str:
     root: Path = project["resolved_path"]
-    status = _git_readonly(root, "status", "--short", "--branch").stdout.strip()
-    history = _git_readonly(root, "log", "-5", "--oneline", "--decorate").stdout.strip()
+    status = _git_readonly(root, "status", "--short", "--branch", "--untracked-files=no").stdout.strip()[:8000]
+    history = _git_readonly(root, "log", "-5", "--oneline", "--decorate").stdout.strip()[:2000]
     tree: list[str] = []
     for current, dirs, names in os.walk(root):
         dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
         depth = len(Path(current).relative_to(root).parts)
         if depth >= 2:
             dirs[:] = []
-        for name in sorted(names):
+        for name in names:
             if name.lower() in {".env", ".env.local", "id_rsa", "id_ed25519"}:
                 continue
             if name.endswith((".py", ".js", ".ts", ".tsx", ".jsx", ".ps1", ".yml", ".yaml", ".sql")):
-                tree.append((Path(current) / name).relative_to(root).as_posix())
+                relative = (Path(current) / name).relative_to(root).as_posix()
+                if len(relative) <= 512:
+                    tree.append(relative)
+                    if len(tree) >= 120:
+                        break
         if len(tree) >= 120:
             break
-    sections = [f"PROJECT: {project['id']}", f"ROOT: {root}", f"GIT STATUS:\n{status or '(clean)'}", f"RECENT COMMITS:\n{history or '(none)'}", "SOURCE FILES:\n" + "\n".join(tree[:120])]
+
+    sections = [
+        f"PROJECT: {project['id']}",
+        f"ROOT: {root}",
+        f"GIT STATUS:\\n{status or '(clean)'}",
+        f"RECENT COMMITS:\\n{history or '(none)'}",
+        "SOURCE FILES:\\n" + "\\n".join(tree)[:10000],
+    ]
+    snapshot = "\\n\\n".join(sections)
     review_files = list(dict.fromkeys((*SAFE_FILES, *project.get("review_files", []))))
     for name in review_files:
-        content = safe_read(root, name)
+        remaining = 40000 - len(snapshot)
+        if remaining <= 64:
+            break
+        header = f"\\n\\n--- {name} ---\\n"
+        content_budget = min(12000, max(0, remaining - len(header)))
+        if content_budget <= 0:
+            break
+        content = safe_read(root, name, limit=content_budget)
         if content:
-            sections.append(f"--- {name} ---\n{content}")
-    return "\n\n".join(sections)[:40000]
-
+            snapshot += header + content
+    return snapshot[:40000]
 
 def ollama_chat(config: dict[str, Any], prompt: str) -> str:
     ollama = config["ollama"]
