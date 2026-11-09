@@ -34,6 +34,7 @@ def load_config(path: Path) -> dict[str, Any]:
         workspace = (path.parent / workspace).resolve()
     config["workspace_path"] = workspace
     seen: list[Path] = []
+    seen_ids: set[str] = set()
     enabled = []
     for project in config["projects"]:
         if not project.get("enabled", False):
@@ -41,6 +42,9 @@ def load_config(path: Path) -> dict[str, Any]:
         project_id = str(project.get("id", ""))
         if not PROJECT_ID.fullmatch(project_id):
             raise AgentError(f"Invalid project id: {project_id!r}")
+        if project_id in seen_ids:
+            raise AgentError(f"Duplicate project id: {project_id}")
+        seen_ids.add(project_id)
         raw_path = str(project.get("path", "")).strip()
         if not raw_path:
             raise AgentError(f"Enabled project {project_id} has no path")
@@ -63,7 +67,7 @@ def load_config(path: Path) -> dict[str, Any]:
         raise AgentError("No enabled projects are configured")
     config.setdefault("ollama", {})
     config["ollama"].setdefault("base_url", "http://127.0.0.1:11434")
-    config["ollama"].setdefault("model", "qwen2.5-coder:3b")
+    config["ollama"].setdefault("model", "qwen3.5:4b")
     config["ollama"].setdefault("timeout_seconds", 240)
     config.setdefault("review_interval_minutes", 360)
     return config
@@ -90,7 +94,7 @@ def collect_snapshot(project: dict[str, Any]) -> str:
     history = subprocess.run(["git", "-C", str(root), "log", "-5", "--oneline", "--decorate"], capture_output=True, text=True, timeout=20, check=True).stdout.strip()
     tree: list[str] = []
     for current, dirs, names in os.walk(root):
-        dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS and not d.startswith("."))
+        dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
         depth = len(Path(current).relative_to(root).parts)
         if depth >= 2:
             dirs[:] = []
@@ -222,11 +226,13 @@ def main() -> int:
         interval = max(30, int(config["review_interval_minutes"]) * 60)
         while True:
             started = time.monotonic()
+            failed = True
             try:
-                run_cycle(config, db)
+                failed = bool(run_cycle(config, db))
             except Exception:
-                LOG.exception("Review cycle failed; daemon will retry next cycle.")
-            time.sleep(max(5, interval - (time.monotonic() - started)))
+                LOG.exception("Review cycle failed; daemon will retry soon.")
+            delay = min(interval, 900) if failed else interval
+            time.sleep(max(5, delay - (time.monotonic() - started)))
     except (AgentError, OSError, ValueError, json.JSONDecodeError) as exc:
         LOG.error("%s", exc)
         return 2
