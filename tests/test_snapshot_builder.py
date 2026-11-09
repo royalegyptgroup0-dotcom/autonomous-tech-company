@@ -9,6 +9,7 @@ import pytest
 from local_agent.git_acquisition import GitAcquisitionResult, VerifiedBlobContent
 from local_agent.git_blob_policy import GitBlobVerification
 from local_agent.git_tree_policy import PinnedTreeMetadata, PinnedTreeObject
+from local_agent.snapshot_policy import validate_snapshot_manifest
 from local_agent.snapshot_builder import (
     SnapshotBuildError,
     SnapshotBuildResult,
@@ -21,7 +22,11 @@ COMMIT = "a" * 40
 CONTENT = b"snapshot-safe-content"
 OID = hashlib.sha1(b"blob " + str(len(CONTENT)).encode("ascii") + b"\0" + CONTENT).hexdigest()
 SHA = hashlib.sha256(CONTENT).hexdigest()
-MANIFEST = "b" * 64
+MANIFEST = validate_snapshot_manifest(
+    commit=COMMIT,
+    tree_entries=[{"path": "src/app.py", "mode": "100644", "type": "blob", "size": len(CONTENT)}],
+    allowed_paths=["src/app.py"],
+).sha256
 
 
 def acquisition():
@@ -124,3 +129,13 @@ def test_rejects_unsafe_cleanup_receipt_path(tmp_path):
     with pytest.raises(ValueError):
         cleanup_disposable_snapshot(forged)
     cleanup_disposable_snapshot(result)
+
+
+def test_rejects_noncanonical_validation_parent(tmp_path):
+    source = tmp_path / "source"
+    parent = tmp_path / "validation"
+    source.mkdir()
+    parent.mkdir()
+    noncanonical = parent / ".." / "validation"
+    with pytest.raises(SnapshotBuildError, match="non-canonical"):
+        build_disposable_snapshot(acquisition(), validation_parent=noncanonical, source_checkout=source)
