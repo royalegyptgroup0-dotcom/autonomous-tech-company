@@ -7,6 +7,7 @@ explicit command registry and copying the registry's exact argv.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import islice
 from typing import Iterable, Mapping, Sequence
 
 
@@ -75,6 +76,8 @@ def build_validation_plan(
         name = entry["name"]
         if not isinstance(name, str) or not name or len(name) > 80 or name.strip() != name:
             raise ValidationPolicyError("Command names must be non-empty canonical strings")
+        if any(ord(char) < 32 or ord(char) == 127 for char in name):
+            raise ValidationPolicyError("Command names cannot contain control characters")
         if name in registry:
             raise ValidationPolicyError(f"Duplicate local command name: {name}")
         argv = _validate_argv(entry["argv"], name)
@@ -89,7 +92,9 @@ def build_validation_plan(
     if isinstance(requested_names, (str, bytes)):
         raise ValidationPolicyError("Requested commands must be a collection of registered names")
     try:
-        names = tuple(requested_names)
+        # Consume at most one item beyond the configured limit. This also
+        # prevents an unbounded or infinite caller-supplied iterable.
+        names = tuple(islice(iter(requested_names), _MAX_COMMANDS + 1))
     except TypeError as exc:
         raise ValidationPolicyError("Requested commands must be iterable") from exc
     if not names or len(names) > _MAX_COMMANDS:
