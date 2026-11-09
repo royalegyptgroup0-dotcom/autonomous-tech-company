@@ -183,7 +183,7 @@ def test_bounded_runner_accepts_maximum_blob_probe_limit(tmp_path):
         3,
         2_000_001,
     )
-    assert result.replace(b"\\r\\n", b"\\n") == b"probe\\n"
+    assert result.replace(b"\r\n", b"\n") == b"probe\n"
 
 
 def test_bounded_runner_rejects_stdout_overflow(tmp_path):
