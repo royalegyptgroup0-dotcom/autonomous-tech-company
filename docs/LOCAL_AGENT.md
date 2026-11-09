@@ -23,7 +23,7 @@ Initial target: Windows; the target machine's RAM, free disk, and GPU/VRAM have 
 1. Install Ollama for Windows from https://ollama.com/download/windows.
 2. In PowerShell, run: ollama pull qwen3.5:4b
 3. Copy config/agent.example.json to config/agent.local.json.
-4. The example config intentionally ships with every project disabled and every path blank. Add exact local repository paths and enable only roots you have personally verified. Each project must be a separate, non-overlapping Git root; never leave a guessed or stale path enabled.
+4. The example config intentionally ships with every project disabled and every path blank. Add exact local repository paths and enable only roots you have personally verified. Each project must be a separate, non-overlapping Git root; never leave a guessed or stale path enabled. Add source files to that project's `review_files` list only after checking that they contain no passwords, API keys, personal data, or other secrets. The agent reads only those explicitly listed source files plus its small built-in documentation/manifest allowlist.
 5. Run: python local_agent/engine.py --config config/agent.local.json --check (validates configuration and the local model without creating the database or reports).
 6. Run one test review: python local_agent/engine.py --config config/agent.local.json --once
 7. Inspect reports under .local-agent/reports/.
