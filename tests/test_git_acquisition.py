@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 import sys
 from types import SimpleNamespace
 
@@ -117,6 +116,17 @@ def test_rejects_invalid_timeout(verified_inspection):
 def test_rejects_non_sha256_archive_digest(verified_inspection):
     with pytest.raises(GitAcquisitionError, match="full lowercase SHA-256"):
         _acquire(archive_inspection=_archive(sha256="not-a-digest"))
+
+
+def test_rejects_archive_file_size_mismatch(verified_inspection):
+    with pytest.raises(GitAcquisitionError, match="byte total"):
+        _acquire(archive_inspection=_archive(size=len(CONTENT) + 1))
+
+
+def test_rejects_unsafe_archive_inspection_path(verified_inspection):
+    bad_file = ArchiveFileDigest("../outside.py", len(CONTENT), ARCHIVE_SHA256)
+    with pytest.raises(GitAcquisitionError, match="unsafe path"):
+        _acquire(archive_inspection=_archive(files=(bad_file,)))
 
 
 def test_rejects_archive_inspection_for_different_commit(verified_inspection):
