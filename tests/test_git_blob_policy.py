@@ -92,3 +92,13 @@ def test_rejects_non_binary_stream():
             expected_sha256=hashlib.sha256(CONTENT).hexdigest(),
             object_format="sha1",
         )
+
+def test_accepts_empty_git_blob():
+    empty = b""
+    result = _verify(
+        content=empty,
+        expected_git_oid=_git_oid(empty, "sha1"),
+        expected_sha256=hashlib.sha256(empty).hexdigest(),
+    )
+    assert result.bytes_read == 0
+    assert result.size_bytes == 0
