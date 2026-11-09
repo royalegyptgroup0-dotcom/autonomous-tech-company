@@ -89,7 +89,10 @@ def load_config(path: Path) -> dict[str, Any]:
     for project in config["projects"]:
         if not isinstance(project, dict):
             raise AgentError("Each config.projects entry must be an object")
-        if not project.get("enabled", False):
+        enabled_flag = project.get("enabled", False)
+        if not isinstance(enabled_flag, bool):
+            raise AgentError("Each project enabled flag must be true or false")
+        if not enabled_flag:
             continue
         project_id = str(project.get("id", ""))
         if not PROJECT_ID.fullmatch(project_id):
@@ -97,7 +100,10 @@ def load_config(path: Path) -> dict[str, Any]:
         if project_id in seen_ids:
             raise AgentError(f"Duplicate project id: {project_id}")
         seen_ids.add(project_id)
-        raw_path = str(project.get("path", "")).strip()
+        raw_path_value = project.get("path", "")
+        if not isinstance(raw_path_value, str):
+            raise AgentError(f"Project path for {project_id} must be a string")
+        raw_path = raw_path_value.strip()
         if not raw_path:
             raise AgentError(f"Enabled project {project_id} has no path")
         root = Path(raw_path).expanduser().resolve()
