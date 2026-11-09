@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import logging
 import os
@@ -10,6 +11,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +25,43 @@ PROJECT_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{1,63}$")
 
 class AgentError(RuntimeError):
     pass
+
+
+def local_ollama_base_url(value: str) -> str:
+    """Accept only plain-HTTP URLs whose literal IP address is loopback."""
+    if not isinstance(value, str) or not value.strip():
+        raise AgentError("Ollama base_url must be a loopback URL such as http://127.0.0.1:11434")
+    try:
+        parsed = urllib.parse.urlsplit(value.strip())
+        host = parsed.hostname
+        port = parsed.port
+        address = ipaddress.ip_address(host) if host else None
+    except ValueError as exc:
+        raise AgentError("Ollama base_url must contain a valid loopback IP address and port") from exc
+    if (
+        parsed.scheme != "http"
+        or address is None
+        or not address.is_loopback
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in ("", "/")
+        or parsed.query
+        or parsed.fragment
+        or (port is not None and not 1 <= port <= 65535)
+    ):
+        raise AgentError("Ollama must use a plain-HTTP loopback IP URL; remote hosts and redirects are not allowed")
+    return value.strip().rstrip("/")
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _open_local_ollama(request, timeout):
+    # Do not let a local service redirect repository data to a remote host.
+    opener = urllib.request.build_opener(_NoRedirectHandler())
+    return opener.open(request, timeout=timeout)
 
 
 def load_config(path: Path) -> dict[str, Any]:
@@ -115,7 +154,8 @@ def collect_snapshot(project: dict[str, Any]) -> str:
 
 def ollama_chat(config: dict[str, Any], prompt: str) -> str:
     ollama = config["ollama"]
-    url = ollama["base_url"].rstrip("/") + "/api/chat"
+    base_url = local_ollama_base_url(ollama["base_url"])
+    url = base_url + "/api/chat"
     body = json.dumps({
         "model": ollama["model"], "stream": False,
         "messages": [
@@ -126,7 +166,7 @@ def ollama_chat(config: dict[str, Any], prompt: str) -> str:
     }).encode("utf-8")
     request = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(request, timeout=int(ollama["timeout_seconds"])) as response:
+        with _open_local_ollama(request, timeout=int(ollama["timeout_seconds"])) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         raise AgentError(f"Local Ollama request failed: {exc}") from exc
@@ -137,9 +177,10 @@ def ollama_chat(config: dict[str, Any], prompt: str) -> str:
 
 
 def ensure_model(config: dict[str, Any]) -> None:
-    url = config["ollama"]["base_url"].rstrip("/") + "/api/tags"
+    base_url = local_ollama_base_url(config["ollama"]["base_url"])
+    url = base_url + "/api/tags"
     try:
-        with urllib.request.urlopen(url, timeout=8) as response:
+        with _open_local_ollama(url, timeout=8) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except Exception as exc:
         raise AgentError(f"Ollama is not reachable at {url}: {exc}") from exc
