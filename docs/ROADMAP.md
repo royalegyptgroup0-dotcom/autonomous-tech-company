@@ -28,8 +28,8 @@
 
 ## Engineering autonomy — staged safety gates
 - Phase 1 (read-only local review): implementation and cross-platform CI are in place; local Windows + Ollama smoke test remains outstanding.
-- Phase 2 (bounded code changes): remains disabled. Build and verify each gate in this order:
-  1. **2A — Patch policy:** implement a standalone, non-applying unified-diff parser. Exact path allowlist; reject traversal, absolute paths, symlinks, renames, binaries, submodules, mode changes, protected paths and oversized patches. Unit tests must prove fail-closed behavior.
+- Phase 2 (bounded code changes): remains disabled. Only the standalone 2A parser exists on a separate draft branch; it is not connected to the Phase 1 runner or any write operation. Build and verify each remaining gate in this order:
+  1. **2A — Patch policy (implemented as an isolated primitive; CI/review pending):** `local_agent/patch_policy.py` parses unified diffs without filesystem access or writes. It enforces exact allowlists and size/count limits; rejects traversal, absolute/ambiguous paths, credentials, protected paths, renames, copies, binaries, create/delete operations, submodules, mode changes and malformed hunks. See `docs/PATCH_POLICY.md`. The parser cannot identify symlinks from text; the pinned worktree gate must independently reject symlink targets before any future apply.
   2. **2B — Disposable worktree:** pin repository identity and base SHA; create a dedicated worktree outside the user's checkout; verify its initial clean state; never edit the configured source checkout.
   3. **2C — Isolated validation:** accept only locally configured test commands, never model-provided commands. Require OS-level network isolation, no inherited secrets, strict timeouts and bounded output before any test execution is enabled.
   4. **2D — Apply and rollback:** keep patch application behind a separate opt-in; independently validate paths immediately before apply; preserve the base SHA; on any failure discard only the disposable worktree. Record patch hash, checks, test commands and exit codes in a local audit record.
