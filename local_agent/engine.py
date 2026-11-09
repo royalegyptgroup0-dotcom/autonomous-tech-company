@@ -60,15 +60,25 @@ class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
 
 def _open_local_ollama(request, timeout):
     # Do not let a local service redirect repository data to a remote host.
-    opener = urllib.request.build_opener(_NoRedirectHandler())
+    # Ignore HTTP(S)_PROXY environment variables: a configured proxy must
+    # never receive repository snapshots, even if NO_PROXY is misconfigured.
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({}),
+        _NoRedirectHandler(),
+    )
     return opener.open(request, timeout=timeout)
 
 
 def load_config(path: Path) -> dict[str, Any]:
     config = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(config, dict):
+        raise AgentError("Configuration root must be a JSON object")
     if not isinstance(config.get("projects"), list):
         raise AgentError("config.projects must be a list")
-    workspace = Path(config.get("workspace", ".local-agent"))
+    workspace_value = config.get("workspace", ".local-agent")
+    if not isinstance(workspace_value, str) or not workspace_value.strip():
+        raise AgentError("config.workspace must be a non-empty path string")
+    workspace = Path(workspace_value)
     if not workspace.is_absolute():
         workspace = (path.parent / workspace).resolve()
     config["workspace_path"] = workspace
@@ -76,6 +86,8 @@ def load_config(path: Path) -> dict[str, Any]:
     seen_ids: set[str] = set()
     enabled = []
     for project in config["projects"]:
+        if not isinstance(project, dict):
+            raise AgentError("Each config.projects entry must be an object")
         if not project.get("enabled", False):
             continue
         project_id = str(project.get("id", ""))
@@ -104,11 +116,37 @@ def load_config(path: Path) -> dict[str, Any]:
     config["enabled_projects"] = enabled
     if not enabled:
         raise AgentError("No enabled projects are configured")
-    config.setdefault("ollama", {})
-    config["ollama"].setdefault("base_url", "http://127.0.0.1:11434")
-    config["ollama"].setdefault("model", "qwen3.5:4b")
-    config["ollama"].setdefault("timeout_seconds", 240)
-    config.setdefault("review_interval_minutes", 360)
+    # The workspace may live beside repositories, or in a dedicated
+    # .local-agent directory inside one. It must never be a repository root
+    # or an ancestor of a repository.
+    for root in seen:
+        if workspace == root or workspace in root.parents:
+            raise AgentError(f"Workspace must not be a repository root or its parent: {workspace}")
+        if root in workspace.parents and workspace.name != ".local-agent":
+            raise AgentError("A workspace inside a repository must use the dedicated .local-agent directory")
+    ollama = config.setdefault("ollama", {})
+    if not isinstance(ollama, dict):
+        raise AgentError("config.ollama must be an object")
+    ollama.setdefault("base_url", "http://127.0.0.1:11434")
+    ollama.setdefault("model", "qwen3.5:4b")
+    ollama.setdefault("timeout_seconds", 240)
+    local_ollama_base_url(ollama["base_url"])
+    if not isinstance(ollama["model"], str) or not ollama["model"].strip():
+        raise AgentError("ollama.model must be a non-empty string")
+    try:
+        timeout = int(ollama["timeout_seconds"])
+    except (TypeError, ValueError) as exc:
+        raise AgentError("ollama.timeout_seconds must be an integer between 10 and 1800") from exc
+    if not 10 <= timeout <= 1800:
+        raise AgentError("ollama.timeout_seconds must be between 10 and 1800")
+    ollama["timeout_seconds"] = timeout
+    try:
+        interval = int(config.get("review_interval_minutes", 360))
+    except (TypeError, ValueError) as exc:
+        raise AgentError("review_interval_minutes must be an integer of at least 1") from exc
+    if interval < 1:
+        raise AgentError("review_interval_minutes must be at least 1")
+    config["review_interval_minutes"] = interval
     return config
 
 
