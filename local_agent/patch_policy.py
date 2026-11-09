@@ -55,6 +55,18 @@ DEFAULT_PROTECTED_PATHS = (
     "docker-compose.yml",
     "pyproject.toml",
     "requirements.txt",
+    "package.json",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "Cargo.toml",
+    "go.mod",
+    "composer.json",
+    "Pipfile",
+    "Pipfile.lock",
+    "poetry.lock",
+    "uv.lock",
+    ".gitmodules",
 )
 
 _DIFF_HEADER = re.compile(r"^diff --git a/(.+) b/(.+)$")
@@ -118,6 +130,15 @@ def validate_unified_diff(
     copies, binary patches, mode changes, submodules, and protected paths
     are rejected. A caller must separately verify base-tree symlink status.
     """
+    if not isinstance(limits, PatchLimits):
+        raise PatchPolicyError("limits must be a PatchLimits value")
+    defaults = PatchLimits()
+    for field in ("max_patch_bytes", "max_files", "max_file_bytes", "max_changed_lines", "max_path_length"):
+        value = getattr(limits, field)
+        if not isinstance(value, int) or isinstance(value, bool) or value < 1 or value > getattr(defaults, field):
+            raise PatchPolicyError(f"{field} must be a positive integer no greater than its safe default")
+    if isinstance(protected_paths, (str, bytes)):
+        raise PatchPolicyError("protected_paths must be a collection, not one string")
     if not isinstance(patch, str) or not patch:
         raise PatchPolicyError("Patch must be a non-empty string")
     try:
@@ -137,7 +158,7 @@ def validate_unified_diff(
     }
     if not allow:
         raise PatchPolicyError("An explicit, non-empty exact-path allowlist is required")
-    protected = tuple(protected_paths)
+    protected = tuple(dict.fromkeys((*DEFAULT_PROTECTED_PATHS, *protected_paths)))
 
     lines = patch.splitlines()
     if not lines or not lines[0].startswith("diff --git "):
