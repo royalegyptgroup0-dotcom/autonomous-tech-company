@@ -221,10 +221,6 @@ def validate_unified_diff(
                 if index >= len(block):
                     raise PatchPolicyError("Truncated unified-diff hunk")
                 line = block[index]
-                if line.startswith("\\ No newline at end of file"):
-                    index += 1
-                    continue
-                if not line:
                     raise PatchPolicyError("Malformed empty diff line")
                 marker = line[0]
                 if marker == " ":
@@ -242,7 +238,7 @@ def validate_unified_diff(
                     raise PatchPolicyError("Hunk line counts exceed the declared ranges")
                 index += 1
             no_newline_markers = 0
-            while index < len(block) and block[index].startswith("\\\\ No newline at end of file"):
+            while index < len(block) and block[index].startswith("\\ No newline at end of file"):
                 no_newline_markers += 1
                 if no_newline_markers > 2:
                     raise PatchPolicyError("Too many no-newline markers")
