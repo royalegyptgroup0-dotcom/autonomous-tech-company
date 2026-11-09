@@ -239,17 +239,17 @@ def collect_snapshot(project: dict[str, Any]) -> str:
     sections = [
         f"PROJECT: {project['id']}",
         f"ROOT: {root}",
-        f"GIT STATUS:\\n{status or '(clean)'}",
-        f"RECENT COMMITS:\\n{history or '(none)'}",
-        "SOURCE FILES:\\n" + "\\n".join(tree)[:10000],
+        f"GIT STATUS:\n{status or '(clean)'}",
+        f"RECENT COMMITS:\n{history or '(none)'}",
+        "SOURCE FILES:\n" + "\n".join(tree)[:10000],
     ]
-    snapshot = "\\n\\n".join(sections)
+    snapshot = "\n\n".join(sections)
     review_files = list(dict.fromkeys((*SAFE_FILES, *project.get("review_files", []))))
     for name in review_files:
         remaining = 40000 - len(snapshot)
         if remaining <= 64:
             break
-        header = f"\\n\\n--- {name} ---\\n"
+        header = f"\n\n--- {name} ---\n"
         content_budget = min(12000, max(0, remaining - len(header)))
         if content_budget <= 0:
             break
