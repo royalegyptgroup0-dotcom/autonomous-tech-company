@@ -86,7 +86,7 @@ def _validate_path(path: str, limits: PatchLimits) -> str:
         or path.startswith("~")
         or "\\" in path
         or ":" in path
-        or any(ch.isspace() for ch in path)
+        or any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in path)
         or "\x00" in path
         or "//" in path
     ):
@@ -94,6 +94,12 @@ def _validate_path(path: str, limits: PatchLimits) -> str:
     parts = path.split("/")
     if any(part in ("", ".", "..") for part in parts):
         raise PatchPolicyError(f"Path traversal or non-canonical path: {path!r}")
+    windows_devices = re.compile(
+        r"^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9]|COM[¹²³]|LPT[¹²³])(?:\..*)?$",
+        re.IGNORECASE,
+    )
+    if any(windows_devices.fullmatch(part) for part in parts):
+        raise PatchPolicyError("Windows reserved device names are not valid patch paths")
     blocked_names = {".git", ".ssh", ".npmrc", ".pypirc", ".netrc", "id_rsa", "id_ed25519"}
     if any(
         part.casefold() in blocked_names
