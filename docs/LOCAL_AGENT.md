@@ -12,9 +12,9 @@ Initial target: Windows + 16 GB RAM, GPU unknown. Start with qwen3.5:4b (about 4
 
 - Per-project registry with separate repository roots and IDs.
 - Read-only Git status/history and bounded repository snapshot collection.
-- Local Ollama inference only.
+- Local Ollama inference only; proxy environment variables are ignored, redirects are refused, and only loopback IP literals are accepted.
 - Periodic review cycle with independent failure handling per project.
-- SQLite run history and Markdown reports.
+- SQLite run history, local Markdown reports, and size-limited rotating logs under `.local-agent/logs/`.
 - Windows Task Scheduler launcher with restart-on-failure settings.
 - No arbitrary shell execution, file edits, commits, pushes, merges, deployment, or secret collection.
 
@@ -24,10 +24,11 @@ Initial target: Windows + 16 GB RAM, GPU unknown. Start with qwen3.5:4b (about 4
 2. In PowerShell, run: ollama pull qwen3.5:4b
 3. Copy config/agent.example.json to config/agent.local.json.
 4. Add local repository paths. Enable only projects whose repository roots you have verified. Each project must be a separate, non-overlapping Git root.
-5. Run: python local_agent/engine.py --config config/agent.local.json --check
+5. Run: python local_agent/engine.py --config config/agent.local.json --check (validates configuration and the local model without creating the database or reports).
 6. Run one test review: python local_agent/engine.py --config config/agent.local.json --once
 7. Inspect reports under .local-agent/reports/.
-8. Install the logon task: powershell -ExecutionPolicy Bypass -File scripts/Install-LocalAgentTask.ps1
+8. Inspect `.local-agent/logs/agent.log` if the scheduled run reports errors; logs rotate at 2 MB with three backups.
+9. Install the logon task: powershell -ExecutionPolicy Bypass -File scripts/Install-LocalAgentTask.ps1
 
 The first run of the task installer creates the private local config if missing; edit and run the installer again to register it. The task runs in the signed-in user's session. It cannot run while the PC is powered off, sleeping, or the user is signed out.
 
