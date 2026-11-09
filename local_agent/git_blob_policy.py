@@ -58,15 +58,12 @@ def verify_git_blob_stream(
         raise GitBlobPolicyError("Git blob object ID does not match repository object format")
     if not isinstance(expected_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", expected_sha256):
         raise GitBlobPolicyError("Expected archive SHA-256 must be a full lowercase digest")
-    for name, value, upper in (
-        ("expected_size", expected_size, max_file_bytes),
-        ("max_chunk_bytes", max_chunk_bytes, 65_536),
-        ("max_file_bytes", max_file_bytes, 2_000_000),
-    ):
-        if not isinstance(value, int) or isinstance(value, bool) or value < 1 or value > upper:
-            raise GitBlobPolicyError(f"{name} is outside its safe bound")
-    if expected_size > max_file_bytes:
-        raise GitBlobPolicyError("Git blob exceeds the configured file-size limit")
+    if not isinstance(max_file_bytes, int) or isinstance(max_file_bytes, bool) or not 1 <= max_file_bytes <= 2_000_000:
+        raise GitBlobPolicyError("max_file_bytes is outside its safe bound")
+    if not isinstance(max_chunk_bytes, int) or isinstance(max_chunk_bytes, bool) or not 1 <= max_chunk_bytes <= 65_536:
+        raise GitBlobPolicyError("max_chunk_bytes is outside its safe bound")
+    if not isinstance(expected_size, int) or isinstance(expected_size, bool) or not 0 <= expected_size <= max_file_bytes:
+        raise GitBlobPolicyError("expected_size is outside its safe bound")
     if not hasattr(source, "read") or not callable(source.read):
         raise GitBlobPolicyError("A readable binary stream is required")
 
