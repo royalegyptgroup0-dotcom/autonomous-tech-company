@@ -4,6 +4,7 @@ import argparse
 import ipaddress
 import json
 import logging
+import logging.handlers
 import os
 import re
 import sqlite3
@@ -205,7 +206,10 @@ def ollama_chat(config: dict[str, Any], prompt: str) -> str:
     request = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
     try:
         with _open_local_ollama(request, timeout=int(ollama["timeout_seconds"])) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+            raw = response.read(2_000_001)
+            if len(raw) > 2_000_000:
+                raise AgentError("Ollama response exceeded the 2 MB safety limit")
+            payload = json.loads(raw.decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         raise AgentError(f"Local Ollama request failed: {exc}") from exc
     message = payload.get("message", {}).get("content", "")
@@ -219,7 +223,10 @@ def ensure_model(config: dict[str, Any]) -> None:
     url = base_url + "/api/tags"
     try:
         with _open_local_ollama(url, timeout=8) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+            raw = response.read(1_000_001)
+            if len(raw) > 1_000_000:
+                raise AgentError("Ollama model-list response exceeded the 1 MB safety limit")
+            payload = json.loads(raw.decode("utf-8"))
     except Exception as exc:
         raise AgentError(f"Ollama is not reachable at {url}: {exc}") from exc
     names = {item.get("name") for item in payload.get("models", [])}
@@ -232,9 +239,22 @@ def write_report(config: dict[str, Any], project: dict[str, Any], report: str) -
     out = config["workspace_path"] / "reports" / project["id"]
     out.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    target = out / f"review-{stamp}.md"
+    target = out / f"review-{stamp}-{time.time_ns() % 1_000_000:06d}.md"
     target.write_text(report.rstrip() + "\n", encoding="utf-8")
     return target
+
+
+def configure_file_logging(config: dict[str, Any]) -> None:
+    log_dir = config["workspace_path"] / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    handler = logging.handlers.RotatingFileHandler(
+        log_dir / "agent.log",
+        maxBytes=2_000_000,
+        backupCount=3,
+        encoding="utf-8",
+    )
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    LOG.addHandler(handler)
 
 
 def init_store(config: dict[str, Any]) -> Path:
@@ -293,13 +313,14 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     try:
         config = load_config(args.config.resolve())
-        db = init_store(config)
         if args.check:
             ensure_model(config)
             LOG.info("Configuration, repositories, and model are ready.")
             return 0
         if not args.once and not args.loop:
             parser.error("choose --check, --once, or --loop")
+        db = init_store(config)
+        configure_file_logging(config)
         if args.once:
             return 1 if run_cycle(config, db) else 0
         interval = max(30, int(config["review_interval_minutes"]) * 60)
@@ -312,7 +333,7 @@ def main() -> int:
                 LOG.exception("Review cycle failed; daemon will retry soon.")
             delay = min(interval, 900) if failed else interval
             time.sleep(max(5, delay - (time.monotonic() - started)))
-    except (AgentError, OSError, ValueError, json.JSONDecodeError) as exc:
+    except (AgentError, OSError, ValueError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
         LOG.error("%s", exc)
         return 2
 
