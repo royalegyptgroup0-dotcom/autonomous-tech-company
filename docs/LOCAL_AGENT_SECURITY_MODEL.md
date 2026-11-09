@@ -40,7 +40,11 @@ This document defines the minimum security boundary for the local engineering ag
 | Tests fail or time out | Do not publish; keep failure evidence and discard the disposable worktree |
 | Remote API or paid quota is unavailable | Continue local documentation and analysis; do not upgrade, purchase, or silently switch to a paid service |
 
-## Phase 2A implementation status\n\nA standalone, non-applying parser and fail-closed unit tests are present on a separate draft branch. They are not wired into the runner and do not authorize file writes. CI and independent review are still required. Phase 2B–2E remain unimplemented and Phase 2 remains disabled.\n\n## Current release gate
+## Phase 2A implementation status
+
+A standalone, non-applying parser and fail-closed unit tests are present on a separate draft branch. They are not wired into the runner and do not authorize file writes. CI and independent review are still required. Phase 2B–2E remain unimplemented and Phase 2 remains disabled.
+
+## Current release gate
 
 The existing Phase 1 implementation remains read-only. The Windows + Ollama smoke test is still required on the user's machine. Until that succeeds, do not register the scheduled task or describe the local agent as operational.
 
