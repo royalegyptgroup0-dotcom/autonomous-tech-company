@@ -47,8 +47,9 @@ A Windows-native, local-first review agent is being developed in a separate draf
 - Implementation and setup: [docs/LOCAL_AGENT.md](docs/LOCAL_AGENT.md)
 - Read-only Windows hardware/tool preflight: [scripts/Test-LocalAgentPrerequisites.ps1](scripts/Test-LocalAgentPrerequisites.ps1)
 - Example configuration: [config/agent.example.json](config/agent.example.json)
-- Current implementation review: [Pull request #1](https://github.com/royalegyptgroup0-dotcom/autonomous-tech-company/pull/1) (draft; not merged)
-- CI validation: Ubuntu and Windows, including PowerShell syntax checks.
+- Engineering work is on branch `feature/local-autonomous-engineering-agent-2026-11-09`; the earlier [Pull request #1](https://github.com/royalegyptgroup0-dotcom/autonomous-tech-company/pull/1) is closed without merge.
+- CI validation: the initial implementation and follow-up symlink regression test passed on Ubuntu and Windows, including PowerShell syntax checks.
+- Local Windows + Ollama smoke test is still required before enabling the agent or registering its scheduled task.
 
 The example config intentionally has all projects disabled and blank paths. Run the preflight before downloading a local model, then configure only verified local repository roots before running the agent. Real Windows + Ollama inference remains a manual release gate.
 

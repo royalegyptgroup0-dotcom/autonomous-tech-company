@@ -70,6 +70,25 @@ def _open_local_ollama(request, timeout):
     return opener.open(request, timeout=timeout)
 
 
+
+def _git_readonly(root: Path, *arguments: str, timeout: int = 20):
+    """Run bounded Git metadata reads without repository fsmonitor hooks or inherited Git overrides."""
+    env = {
+        key: value for key, value in os.environ.items()
+        if not key.upper().startswith("GIT_")
+    }
+    env["GIT_CONFIG_NOSYSTEM"] = "1"
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    return subprocess.run(
+        [
+            "git", "-c", "core.fsmonitor=false",
+            "-c", "core.untrackedCache=false",
+            "-C", str(root), *arguments,
+        ],
+        capture_output=True, text=True, timeout=timeout, check=True, env=env,
+    )
+
+
 def load_config(path: Path) -> dict[str, Any]:
     config = json.loads(path.read_text(encoding="utf-8-sig"))
     if not isinstance(config, dict):
@@ -112,16 +131,18 @@ def load_config(path: Path) -> dict[str, Any]:
         if any(root == other or root in other.parents or other in root.parents for other in seen):
             raise AgentError(f"Project paths must be distinct and non-overlapping: {root}")
         seen.append(root)
-        git_root = subprocess.run(
-            ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
-            capture_output=True, text=True, timeout=15, check=True,
-        ).stdout.strip()
+        git_root = _git_readonly(root, "rev-parse", "--show-toplevel", timeout=15).stdout.strip()
         if Path(git_root).resolve() != root:
             raise AgentError(f"Project path must be the repository root: {root}")
         review_files = project.get("review_files", [])
         if not isinstance(review_files, list) or any(not isinstance(item, str) or not item.strip() for item in review_files):
             raise AgentError(f"review_files for {project_id} must be a list of non-empty relative path strings")
-        project["review_files"] = list(dict.fromkeys(item.strip() for item in review_files))
+        normalized_review_files = list(dict.fromkeys(item.strip() for item in review_files))
+        if len(normalized_review_files) > 50:
+            raise AgentError(f"review_files for {project_id} may contain at most 50 paths")
+        if any(len(item) > 512 for item in normalized_review_files):
+            raise AgentError(f"review_files for {project_id} contains a path longer than 512 characters")
+        project["review_files"] = normalized_review_files
         project["resolved_path"] = root
         enabled.append(project)
     config["enabled_projects"] = enabled
@@ -170,7 +191,17 @@ def load_config(path: Path) -> dict[str, Any]:
 
 def safe_read(root: Path, relative: str, limit: int = 12000) -> str:
     rel = Path(relative)
-    if rel.is_absolute() or ".." in rel.parts or any(part.lower() in {".env", "secrets", "credentials"} for part in rel.parts):
+    blocked_names = {"secrets", "credentials", ".git", ".ssh", ".npmrc", ".pypirc", ".netrc", "id_rsa", "id_ed25519"}
+    if (
+        rel.is_absolute()
+        or ".." in rel.parts
+        or any(
+            part.lower() in blocked_names
+            or part.lower().startswith(".env")
+            or part.lower().endswith((".pem", ".key", ".p12", ".pfx", ".jks", ".keystore"))
+            for part in rel.parts
+        )
+    ):
         return ""
     target = (root / rel).resolve()
     if root.resolve() not in target.parents or not target.is_file():
@@ -185,29 +216,47 @@ def safe_read(root: Path, relative: str, limit: int = 12000) -> str:
 
 def collect_snapshot(project: dict[str, Any]) -> str:
     root: Path = project["resolved_path"]
-    status = subprocess.run(["git", "-C", str(root), "status", "--short", "--branch"], capture_output=True, text=True, timeout=20, check=True).stdout.strip()
-    history = subprocess.run(["git", "-C", str(root), "log", "-5", "--oneline", "--decorate"], capture_output=True, text=True, timeout=20, check=True).stdout.strip()
+    status = _git_readonly(root, "status", "--short", "--branch", "--untracked-files=no").stdout.strip()[:8000]
+    history = _git_readonly(root, "log", "-5", "--oneline", "--decorate").stdout.strip()[:2000]
     tree: list[str] = []
     for current, dirs, names in os.walk(root):
         dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
         depth = len(Path(current).relative_to(root).parts)
         if depth >= 2:
             dirs[:] = []
-        for name in sorted(names):
+        for name in names:
             if name.lower() in {".env", ".env.local", "id_rsa", "id_ed25519"}:
                 continue
             if name.endswith((".py", ".js", ".ts", ".tsx", ".jsx", ".ps1", ".yml", ".yaml", ".sql")):
-                tree.append((Path(current) / name).relative_to(root).as_posix())
+                relative = (Path(current) / name).relative_to(root).as_posix()
+                if len(relative) <= 512:
+                    tree.append(relative)
+                    if len(tree) >= 120:
+                        break
         if len(tree) >= 120:
             break
-    sections = [f"PROJECT: {project['id']}", f"ROOT: {root}", f"GIT STATUS:\n{status or '(clean)'}", f"RECENT COMMITS:\n{history or '(none)'}", "SOURCE FILES:\n" + "\n".join(tree[:120])]
+
+    sections = [
+        f"PROJECT: {project['id']}",
+        f"ROOT: {root}",
+        f"GIT STATUS:\n{status or '(clean)'}",
+        f"RECENT COMMITS:\n{history or '(none)'}",
+        "SOURCE FILES:\n" + "\n".join(tree)[:10000],
+    ]
+    snapshot = "\n\n".join(sections)
     review_files = list(dict.fromkeys((*SAFE_FILES, *project.get("review_files", []))))
     for name in review_files:
-        content = safe_read(root, name)
+        remaining = 40000 - len(snapshot)
+        if remaining <= 64:
+            break
+        header = f"\n\n--- {name} ---\n"
+        content_budget = min(12000, max(0, remaining - len(header)))
+        if content_budget <= 0:
+            break
+        content = safe_read(root, name, limit=content_budget)
         if content:
-            sections.append(f"--- {name} ---\n{content}")
-    return "\n\n".join(sections)[:40000]
-
+            snapshot += header + content
+    return snapshot[:40000]
 
 def ollama_chat(config: dict[str, Any], prompt: str) -> str:
     ollama = config["ollama"]
