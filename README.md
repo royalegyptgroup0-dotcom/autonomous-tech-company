@@ -45,11 +45,12 @@ The public website is deployed on Cloudflare Pages: https://autonomous-tech-comp
 A Windows-native, local-first review agent is being developed in a separate draft pull request. It uses Ollama on loopback only, reads enabled Git repositories, and stores reports/logs locally. It does not edit source code, run arbitrary commands, push changes, merge pull requests, or deploy.
 
 - Implementation and setup: [docs/LOCAL_AGENT.md](docs/LOCAL_AGENT.md)
+- Read-only Windows hardware/tool preflight: [scripts/Test-LocalAgentPrerequisites.ps1](scripts/Test-LocalAgentPrerequisites.ps1)
 - Example configuration: [config/agent.example.json](config/agent.example.json)
 - Current implementation review: [Pull request #1](https://github.com/royalegyptgroup0-dotcom/autonomous-tech-company/pull/1) (draft; not merged)
 - CI validation: Ubuntu and Windows, including PowerShell syntax checks.
 
-The example config intentionally has all projects disabled and blank paths. Configure only verified local repository roots before running it. Real Windows + Ollama inference remains a manual release gate.
+The example config intentionally has all projects disabled and blank paths. Run the preflight before downloading a local model, then configure only verified local repository roots before running the agent. Real Windows + Ollama inference remains a manual release gate.
 
 ## Next milestones
 See `docs/ROADMAP.md` and `docs/REVENUE_PLAN.md`.
