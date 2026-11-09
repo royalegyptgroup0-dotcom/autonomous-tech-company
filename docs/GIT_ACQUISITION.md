@@ -21,8 +21,8 @@ For one already-registered, clean worktree, the acquisition function:
 
 The default subprocess runner uses argv arrays with \`shell=False\`, no stdin,
 a filtered environment, disabled Git prompts, no system/global Git config,
-disabled replace refs and lazy fetching, strict per-command timeouts, and
-bounded stdout/stderr draining. Proxy environment variables are not inherited.
+disabled replace refs and lazy fetching, strict per-command timeouts, a capped stdout stream, and stderr draining
+without retention. Proxy environment variables are not inherited.
 No remote/network Git subcommand is used.
 
 ## Required inputs and trust assumptions
