@@ -18,7 +18,7 @@ This document defines the minimum security boundary for the local engineering ag
 
 1. **Separate worktree:** never edit the user's working tree or the configured source checkout. Create a dedicated disposable Git worktree from a pinned commit.
 2. **Pinned base:** record repository identity, base commit SHA, branch name, and worktree path before generating a patch.
-3. **Patch-only interface:** the model may propose a unified diff as data. It must not call tools or execute commands. Reject binary patches, renames, submodules, symlinks, mode changes, absolute paths, parent traversal, and paths outside an explicit write allowlist.
+3. **Patch-only interface:** the model may propose a unified diff as data. It must not call tools or execute commands. The standalone Phase 2A parser rejects binary patches, renames, copies, submodules, mode changes, create/delete operations, absolute paths, parent traversal, protected paths, and paths outside an exact write allowlist. The parser cannot determine whether a target is a symlink; the pinned worktree must inspect filesystem metadata and reject symlink/non-regular targets independently.
 4. **Patch validation:** parse the diff independently; enforce file count, per-file size, total size, and changed-line limits. Reject modifications to secrets, credentials, CI permissions, deployment configuration, billing, identity, access control, and production infrastructure unless a separate explicit approval is recorded.
 5. **No automatic apply:** show the exact patch and its target commit before applying. The default mode remains report-only. A future apply mode must be a distinct opt-in.
 6. **Test allowlist:** never execute commands supplied by the model or repository. Tests must be selected from a locally maintained command allowlist, run with timeouts and resource limits, and without secrets or production credentials.
@@ -40,7 +40,7 @@ This document defines the minimum security boundary for the local engineering ag
 | Tests fail or time out | Do not publish; keep failure evidence and discard the disposable worktree |
 | Remote API or paid quota is unavailable | Continue local documentation and analysis; do not upgrade, purchase, or silently switch to a paid service |
 
-## Current release gate
+## Phase 2A implementation status\n\nA standalone, non-applying parser and fail-closed unit tests are present on a separate draft branch. They are not wired into the runner and do not authorize file writes. CI and independent review are still required. Phase 2B–2E remain unimplemented and Phase 2 remains disabled.\n\n## Current release gate
 
 The existing Phase 1 implementation remains read-only. The Windows + Ollama smoke test is still required on the user's machine. Until that succeeds, do not register the scheduled task or describe the local agent as operational.
 
