@@ -12,7 +12,7 @@ CONTENT = b"hello world"
 
 
 def _git_oid(content: bytes, algorithm: str) -> str:
-    header = f"blob {len(content)}\\0".encode("ascii")
+    header = f"blob {len(content)}".encode("ascii") + bytes((0,))
     return hashlib.new(algorithm, header + content).hexdigest()
 
 
