@@ -71,7 +71,7 @@ def _open_local_ollama(request, timeout):
 
 
 def load_config(path: Path) -> dict[str, Any]:
-    config = json.loads(path.read_text(encoding="utf-8"))
+    config = json.loads(path.read_text(encoding="utf-8-sig"))
     if not isinstance(config, dict):
         raise AgentError("Configuration root must be a JSON object")
     if not isinstance(config.get("projects"), list):
