@@ -175,7 +175,7 @@ def _write_exclusive(path: Path, content: bytes) -> None:
 def _marker_payload(token: str, commit: str, manifest_sha256: str, files: tuple[str, ...]) -> bytes:
     data = {
         "version": _MARKER_VERSION,
-        "owner_token": token,
+        "owner_token_sha256": hashlib.sha256(token.encode("ascii")).hexdigest(),
         "commit": commit,
         "manifest_sha256": manifest_sha256,
         "files": list(files),
