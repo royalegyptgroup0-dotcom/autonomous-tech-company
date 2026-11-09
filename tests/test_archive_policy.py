@@ -110,7 +110,8 @@ def test_rejects_size_mismatch_and_truncated_content():
     manifest = _manifest()
     with pytest.raises(ArchivePolicyError, match="size"):
         inspect_tar_stream(_tar([_file(content=b"short")]), manifest)
-    truncated = io.BytesIO(_tar([_file()]).getvalue()[:-1024])
+    raw = _tar([_file()]).getvalue()
+    truncated = io.BytesIO(raw[:517])
     with pytest.raises(ArchivePolicyError):
         inspect_tar_stream(truncated, manifest)
 
