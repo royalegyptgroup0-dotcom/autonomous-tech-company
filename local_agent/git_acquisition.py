@@ -38,6 +38,7 @@ Runner = Callable[[list[str], Path, dict[str, str], int, int], bytes]
 _HEX_COMMIT = re.compile(r"^[0-9a-f]{40,64}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _MAX_TREE_OUTPUT = 2_000_000
+_MAX_GIT_OUTPUT = 2_000_001
 
 
 def _safe_git_environment() -> dict[str, str]:
@@ -70,7 +71,9 @@ def _run_git_bounded(
     """Run fixed Git argv with bounded stdout, timeout and no shell."""
     if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool) or not 1 <= timeout_seconds <= 30:
         raise GitAcquisitionError("Git timeout is outside its safe bound")
-    if not isinstance(max_output_bytes, int) or isinstance(max_output_bytes, bool) or not 1 <= max_output_bytes <= _MAX_TREE_OUTPUT:
+    if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool) or not 1 <= timeout_seconds <= 30:
+        raise GitAcquisitionError("Git timeout is outside its safe bound")
+    if not isinstance(max_output_bytes, int) or isinstance(max_output_bytes, bool) or not 1 <= max_output_bytes <= _MAX_GIT_OUTPUT:
         raise GitAcquisitionError("Git output limit is outside its safe bound")
     try:
         process = subprocess.Popen(
