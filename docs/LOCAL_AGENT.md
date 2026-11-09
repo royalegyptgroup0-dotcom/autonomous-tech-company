@@ -6,7 +6,7 @@ A free-first, Windows-native, local agent that remains available while the PC is
 
 ## Hardware profile
 
-Initial target: Windows + 16 GB RAM, GPU unknown. Start with qwen3.5:4b (about 4 GB model download) and CPU fallback. This model is published under Apache-2.0. If CPU speed or available memory is insufficient, switch to qwen3.5:2b. Do not download a larger model until GPU/VRAM and available memory are checked. Ollama runs natively on Windows and exposes its local API at http://localhost:11434.
+Initial target: Windows + 16 GB RAM, GPU unknown. Start with qwen3.5:4b (about 4 GB model download) and CPU fallback. This model is published under Apache-2.0. If CPU speed or available memory is insufficient, switch to qwen3.5:2b. Do not download a larger model until GPU/VRAM and available memory are checked. Ollama runs natively on Windows and exposes its local API at http://127.0.0.1:11434. The agent accepts only plain-HTTP loopback IP addresses (127.0.0.1 or ::1) and rejects redirects; remote inference endpoints and hostname-based URLs are intentionally unsupported.
 
 ## Phase 1 delivered here
 
