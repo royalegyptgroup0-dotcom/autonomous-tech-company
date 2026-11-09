@@ -156,8 +156,8 @@ def test_rejects_nul_content():
 
 def test_accepts_unchanged_regular_file_mode_metadata():
     patch = _patch().replace(
-        "index 1111111..2222222\\n",
-        "index 1111111..2222222 100644\\n",
+        "index 1111111..2222222\n",
+        "index 1111111..2222222 100644\n",
     )
     result = validate_unified_diff(patch, allowed_paths={"src/example.py"})
     assert result.files[0].path == "src/example.py"
@@ -165,8 +165,8 @@ def test_accepts_unchanged_regular_file_mode_metadata():
 
 def test_rejects_symlink_mode_metadata():
     patch = _patch().replace(
-        "index 1111111..2222222\\n",
-        "index 1111111..2222222 120000\\n",
+        "index 1111111..2222222\n",
+        "index 1111111..2222222 120000\n",
     )
     with pytest.raises(PatchPolicyError, match="Unsupported diff metadata"):
         validate_unified_diff(patch, allowed_paths={"src/example.py"})
