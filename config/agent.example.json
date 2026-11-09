@@ -1,0 +1,48 @@
+{
+  "ollama": {
+    "base_url": "http://127.0.0.1:11434",
+    "model": "qwen2.5:3b",
+    "timeout_seconds": 300,
+    "context_length": 4096
+  },
+  "workspace": "../.local-agent",
+  "review_interval_minutes": 360,
+  "projects": [
+    {
+      "id": "autonomous-tech-company",
+      "path": "",
+      "enabled": false,
+      "review_files": []
+    },
+    {
+      "id": "octopusa",
+      "path": "",
+      "enabled": false,
+      "review_files": []
+    },
+    {
+      "id": "royal-media-player",
+      "path": "",
+      "enabled": false,
+      "review_files": []
+    },
+    {
+      "id": "royal-egypt-group",
+      "path": "",
+      "enabled": false,
+      "review_files": []
+    },
+    {
+      "id": "royal-egypt-agent",
+      "path": "",
+      "enabled": false,
+      "review_files": []
+    },
+    {
+      "id": "ceo-notes",
+      "path": "",
+      "enabled": false,
+      "review_files": []
+    }
+  ]
+}
