@@ -16,19 +16,21 @@ Initial target: Windows; the target machine's RAM, free disk, and GPU/VRAM have 
 - Periodic review cycle with independent failure handling per project.
 - SQLite run history, local Markdown reports, and size-limited rotating logs under `.local-agent/logs/`.
 - Windows Task Scheduler launcher with restart-on-failure settings.
+- Read-only prerequisite script checks Git, Python, Ollama, physical RAM, free disk, and installed Ollama models without installing or downloading anything.
 - No arbitrary shell execution, file edits, commits, pushes, merges, deployment, or secret collection.
 
 ## Setup
 
-1. Install Ollama for Windows from https://ollama.com/download/windows.
-2. In PowerShell, run: ollama pull qwen3.5:4b
-3. Copy config/agent.example.json to config/agent.local.json.
-4. The example config intentionally ships with every project disabled and every path blank. Add exact local repository paths and enable only roots you have personally verified. Each project must be a separate, non-overlapping Git root; never leave a guessed or stale path enabled. Add source files to that project's `review_files` list only after checking that they contain no passwords, API keys, personal data, or other secrets. The agent reads only those explicitly listed source files plus its small built-in documentation/manifest allowlist.
-5. Run: python local_agent/engine.py --config config/agent.local.json --check (validates configuration and the local model without creating the database or reports).
-6. Run one test review: python local_agent/engine.py --config config/agent.local.json --once
-7. Inspect reports under .local-agent/reports/.
-8. Inspect `.local-agent/logs/agent.log` if the scheduled run reports errors; logs rotate at 2 MB with three backups.
-9. Install the logon task: powershell -ExecutionPolicy Bypass -File scripts/Install-LocalAgentTask.ps1
+1. Run the read-only hardware/tool check in PowerShell: `powershell -NoProfile -File scripts/Test-LocalAgentPrerequisites.ps1`. It does not install software, download models, or change settings.
+2. Review available RAM and free disk. Install Ollama for Windows only if it is not already installed: https://ollama.com/download/windows.
+3. Choose an appropriately sized local model. The default is `qwen3.5:4b`; only after checking available resources, download it with `ollama pull qwen3.5:4b`. Smaller alternatives are `qwen3.5:2b` and `qwen3.5:0.8b`. Model downloads use internet bandwidth and local disk, but do not require a paid model API.
+4. Copy `config/agent.example.json` to `config/agent.local.json`.
+5. The example config intentionally ships with every project disabled and every path blank. Add exact local repository paths and enable only roots you have personally verified. Each project must be a separate, non-overlapping Git root; never leave a guessed or stale path enabled. Add source files to that project's `review_files` list only after checking that they contain no passwords, API keys, personal data, or other secrets. The agent reads only those explicitly listed source files plus its small built-in documentation/manifest allowlist.
+6. Run: `python local_agent/engine.py --config config/agent.local.json --check` (validates configuration and the local model without creating the database or reports).
+7. Run one test review: `python local_agent/engine.py --config config/agent.local.json --once`.
+8. Inspect reports under `.local-agent/reports/`.
+9. Inspect `.local-agent/logs/agent.log` if the scheduled run reports errors; logs rotate at 2 MB with three backups.
+10. Only after the one-time review succeeds and its local report is inspected, optionally install the logon task: `powershell -ExecutionPolicy Bypass -File scripts/Install-LocalAgentTask.ps1`.
 
 The first run of the task installer creates the private local config if missing; edit and run the installer again to register it. The task runs in the signed-in user's session. It cannot run while the PC is powered off, sleeping, or the user is signed out.
 
