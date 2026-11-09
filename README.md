@@ -38,7 +38,7 @@ uvicorn app.main:app --reload
 Run tests with `pytest -q`.
 
 ## Project status
-The website source is maintained in this repository. A production website deployment, custom domain, business email, customer intake backend and paid services are not configured. Do not describe the site as publicly launched until a hosting deployment has been verified.
+The public website is deployed on Cloudflare Pages: https://autonomous-tech-company.pages.dev (English) and https://autonomous-tech-company.pages.dev/ar/ (Arabic). The production branch is `main`; the Pages project uses `web/` as its root directory and has no build command. Hosting currently uses the free `pages.dev` subdomain. A custom domain, business email and customer-intake backend are not configured. The company name remains provisional and is not represented as a registered or legally cleared trademark.
 
 ## Next milestones
 See `docs/ROADMAP.md` and `docs/REVENUE_PLAN.md`.
