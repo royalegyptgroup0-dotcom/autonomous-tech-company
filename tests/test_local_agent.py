@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from local_agent.engine import (
-    AgentError, PROJECT_ID, _git_readonly, _open_local_ollama, collect_snapshot, load_config,
+    AgentError, PROJECT_ID, _NoRedirectHandler, _git_readonly, _open_local_ollama, collect_snapshot, load_config,
     local_ollama_base_url, safe_read,
 )
 
@@ -73,8 +73,12 @@ def test_local_ollama_opener_disables_environment_proxies(monkeypatch):
     monkeypatch.setattr(urllib.request, "build_opener", fake_build_opener)
     assert _open_local_ollama("http://127.0.0.1:11434/api/tags", 8) == "opened"
     proxies = [h for h in captured["handlers"] if isinstance(h, urllib.request.ProxyHandler)]
+    redirects = [h for h in captured["handlers"] if isinstance(h, urllib.request.HTTPRedirectHandler)]
     assert len(proxies) == 1
     assert proxies[0].proxies == {}
+    assert len(redirects) == 1
+    assert isinstance(redirects[0], _NoRedirectHandler)
+    assert redirects[0].redirect_request(None, None, 302, "Found", {}, "http://203.0.113.10/") is None
 
 
 def _write_agent_config(tmp_path: Path, workspace: Path) -> tuple[Path, Path]:
