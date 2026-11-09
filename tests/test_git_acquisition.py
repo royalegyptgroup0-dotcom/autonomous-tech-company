@@ -175,6 +175,17 @@ def test_bounded_runner_returns_small_stdout_without_shell(tmp_path):
     assert result.replace(b"\r\n", b"\n") == b"bounded\n"
 
 
+def test_bounded_runner_accepts_maximum_blob_probe_limit(tmp_path):
+    result = _run_git_bounded(
+        [sys.executable, "-c", "print('probe')"],
+        tmp_path,
+        {},
+        3,
+        2_000_001,
+    )
+    assert result.replace(b"\\r\\n", b"\\n") == b"probe\\n"
+
+
 def test_bounded_runner_rejects_stdout_overflow(tmp_path):
     with pytest.raises(GitAcquisitionError, match="output limit"):
         _run_git_bounded(
