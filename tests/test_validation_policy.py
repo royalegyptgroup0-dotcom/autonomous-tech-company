@@ -52,7 +52,7 @@ def test_rejects_extra_registry_keys():
 
 @pytest.mark.parametrize("argv", [
     [],
-    ["python", "bad\nargument"],
+    ["python", "bad\\nargument"],
     ["python", "x" * 4097],
     ["python", *([ "x" ] * 64)],
 ])
@@ -86,3 +86,12 @@ def test_rejects_empty_or_duplicate_selection():
 def test_rejects_string_instead_of_name_collection():
     with pytest.raises(ValidationPolicyError):
         build_validation_plan(REGISTRY, "python-tests")
+
+
+def test_bounds_consumption_of_unbounded_iterable():
+    def endless_names():
+        while True:
+            yield "python-tests"
+
+    with pytest.raises(ValidationPolicyError, match="between 1 and 20"):
+        build_validation_plan(REGISTRY, endless_names())
