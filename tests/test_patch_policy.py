@@ -175,3 +175,36 @@ def test_rejects_symlink_mode_metadata():
 def test_rejects_string_instead_of_allowlist_collection():
     with pytest.raises(PatchPolicyError, match="collection"):
         validate_unified_diff(_patch(), allowed_paths="src/example.py")
+
+
+
+def test_custom_protected_paths_cannot_disable_builtin_protections():
+    patch = _patch(".github/workflows/build.yml")
+    with pytest.raises(PatchPolicyError, match="Protected path"):
+        validate_unified_diff(
+            patch,
+            allowed_paths={".github/workflows/build.yml"},
+            protected_paths=(),
+        )
+
+
+@pytest.mark.parametrize("limits", [
+    PatchLimits(max_patch_bytes=256_001),
+    PatchLimits(max_files=21),
+    PatchLimits(max_file_bytes=64_001),
+    PatchLimits(max_changed_lines=2_001),
+    PatchLimits(max_path_length=241),
+])
+def test_callers_cannot_raise_resource_ceilings(limits):
+    with pytest.raises(PatchPolicyError, match="safe default"):
+        validate_unified_diff(_patch(), allowed_paths={"src/example.py"}, limits=limits)
+
+
+def test_callers_can_lower_resource_ceilings():
+    result = validate_unified_diff(
+        _patch(),
+        allowed_paths={"src/example.py"},
+        limits=PatchLimits(max_patch_bytes=1024, max_files=1, max_file_bytes=512,
+                           max_changed_lines=2, max_path_length=120),
+    )
+    assert result.total_additions == 1
