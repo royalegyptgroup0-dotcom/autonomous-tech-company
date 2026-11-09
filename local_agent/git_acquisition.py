@@ -19,7 +19,7 @@ from typing import Callable, Mapping, Sequence
 from .git_blob_policy import GitBlobVerification, verify_git_blob_stream
 from .git_inspector import GitInspection, inspect_registered_worktree
 from .git_tree_policy import PinnedTreeMetadata, parse_ls_tree_output
-from .snapshot_policy import SnapshotLimits, validate_snapshot_manifest
+from .snapshot_policy import SnapshotLimits, SnapshotPolicyError, _safe_path, validate_snapshot_manifest
 
 
 class GitAcquisitionError(ValueError):
@@ -180,9 +180,20 @@ def acquire_and_verify_pinned_blobs(
         raise GitAcquisitionError("Git timeout must be between 1 and 30 seconds")
     if not isinstance(allowed_paths, (list, tuple)) or not 1 <= len(allowed_paths) <= 500:
         raise GitAcquisitionError("Allowed paths must be a bounded non-empty list")
+    safe_paths: list[str] = []
+    folded_paths: set[str] = set()
+    for raw_path in allowed_paths:
+        try:
+            safe_path = _safe_path(raw_path, SnapshotLimits())
+        except SnapshotPolicyError as exc:
+            raise GitAcquisitionError("Allowed path is unsafe or non-canonical") from exc
+        if safe_path.casefold() in folded_paths:
+            raise GitAcquisitionError("Allowed paths contain duplicates or Windows case collisions")
+        safe_paths.append(safe_path)
+        folded_paths.add(safe_path.casefold())
     if not isinstance(archive_sha256_by_path, Mapping):
         raise GitAcquisitionError("Archive SHA-256 values must be a path-to-digest mapping")
-    if set(archive_sha256_by_path) != set(allowed_paths):
+    if set(archive_sha256_by_path) != set(safe_paths):
         raise GitAcquisitionError("Archive digest paths must exactly match the requested allowlist")
     if any(not isinstance(value, str) or not _SHA256.fullmatch(value) for value in archive_sha256_by_path.values()):
         raise GitAcquisitionError("Every archive digest must be a full lowercase SHA-256 value")
@@ -199,12 +210,17 @@ def acquire_and_verify_pinned_blobs(
     if not git:
         raise GitAcquisitionError("Git executable was not found")
     cwd = inspection.worktree_root
+    if inspection.pinned_commit != pinned_commit or not inspection.clean or not inspection.registered:
+        raise GitAcquisitionError("Registered worktree inspection did not confirm the pinned clean checkout")
     env = _safe_git_environment()
     run = _runner or _run_git_bounded
 
     def command(args: Sequence[str], limit: int) -> bytes:
         argv = [git, "-C", str(cwd), *args]
-        return run(argv, cwd, env, timeout_seconds, limit)
+        output = run(argv, cwd, env, timeout_seconds, limit)
+        if not isinstance(output, bytes) or len(output) > limit:
+            raise GitAcquisitionError("Git command returned invalid or oversized output")
+        return output
 
     try:
         resolved = command(["rev-parse", "--verify", f"{pinned_commit}^{{commit}}"], 128).decode("ascii").strip()
@@ -219,15 +235,17 @@ def acquire_and_verify_pinned_blobs(
         raise GitAcquisitionError("Git object format response is invalid") from exc
     if object_format not in ("sha1", "sha256"):
         raise GitAcquisitionError("Repository uses an unsupported Git object format")
+    if len(pinned_commit) != (40 if object_format == "sha1" else 64):
+        raise GitAcquisitionError("Pinned commit length does not match the repository object format")
 
-    literal_pathspecs = [f":(literal){path}" for path in allowed_paths]
+    literal_pathspecs = [f":(literal){path}" for path in safe_paths]
     tree_output = command(
         ["ls-tree", "--full-tree", "-r", "-l", "-z", pinned_commit, "--", *literal_pathspecs],
         _MAX_TREE_OUTPUT,
     )
     tree = parse_ls_tree_output(
         tree_output,
-        expected_paths=allowed_paths,
+        expected_paths=safe_paths,
         object_format=object_format,
         max_output_bytes=_MAX_TREE_OUTPUT,
     )
@@ -235,7 +253,7 @@ def acquire_and_verify_pinned_blobs(
         manifest = validate_snapshot_manifest(
             commit=pinned_commit,
             tree_entries=tree.snapshot_entries,
-            allowed_paths=allowed_paths,
+            allowed_paths=safe_paths,
             limits=SnapshotLimits(),
         )
     except ValueError as exc:
