@@ -202,8 +202,10 @@ def acquire_and_verify_pinned_blobs(
         raise GitAcquisitionError("Archive inspection byte count is smaller than its file content total")
     if not isinstance(archive_inspection.manifest_sha256, str) or not _SHA256.fullmatch(archive_inspection.manifest_sha256):
         raise GitAcquisitionError("Archive inspection manifest digest is invalid")
-    if not isinstance(archive_inspection.files, tuple) or not archive_inspection.files:
-        raise GitAcquisitionError("Archive inspection must contain a non-empty immutable file list")
+    if not isinstance(archive_inspection.files, tuple):
+        raise GitAcquisitionError("Archive inspection file records must be an immutable tuple")
+    if len(archive_inspection.files) != len(safe_paths):
+        raise GitAcquisitionError("Archive inspection files must exactly match the requested allowlist")
     archive_files: dict[str, ArchiveFileDigest] = {}
     for item in archive_inspection.files:
         if not isinstance(item, ArchiveFileDigest):
