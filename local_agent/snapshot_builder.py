@@ -11,13 +11,11 @@ import json
 import os
 from pathlib import Path
 import secrets
-import shutil
 import stat
 import tempfile
-from typing import Iterable
 
 from .git_acquisition import GitAcquisitionResult, VerifiedBlobContent
-from .snapshot_policy import SnapshotLimits, _safe_path
+from .snapshot_policy import SnapshotLimits, _safe_path, validate_snapshot_manifest
 
 
 class SnapshotBuildError(ValueError):
@@ -100,6 +98,17 @@ def _verified_payload(acquisition: GitAcquisitionResult) -> tuple[str, str, tupl
         raise SnapshotBuildError("Git verification records do not exactly match the pinned tree")
     if getattr(tree, "object_format", None) not in ("sha1", "sha256"):
         raise SnapshotBuildError("Pinned tree object format is invalid")
+    try:
+        manifest = validate_snapshot_manifest(
+            commit=commit,
+            tree_entries=tree.snapshot_entries,
+            allowed_paths=[item.path for item in entries],
+            limits=SnapshotLimits(),
+        )
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise SnapshotBuildError("Pinned tree metadata failed manifest policy") from exc
+    if manifest.sha256 != manifest_sha256:
+        raise SnapshotBuildError("Pinned tree manifest digest differs from acquisition result")
     total = 0
     for blob in blobs:
         if not isinstance(blob, VerifiedBlobContent):
@@ -119,7 +128,8 @@ def _verified_payload(acquisition: GitAcquisitionResult) -> tuple[str, str, tupl
         if actual_oid != blob.git_object_id or actual_sha != blob.sha256:
             raise SnapshotBuildError(f"Blob content failed independent digest verification: {path}")
         verified = verify_by_path.get(path)
-        if verified is None or verified.git_object_id != actual_oid or verified.sha256 != actual_sha or verified.size_bytes != blob.size_bytes:
+        if (verified is None or verified.git_object_id != actual_oid or verified.sha256 != actual_sha
+                or verified.size_bytes != blob.size_bytes or verified.object_format != blob.object_format):
             raise SnapshotBuildError(f"Blob does not match its Git verification record: {path}")
         by_path[path] = blob
         total += blob.size_bytes
@@ -132,7 +142,8 @@ def _verified_payload(acquisition: GitAcquisitionResult) -> tuple[str, str, tupl
         raise SnapshotBuildError("Verified content total differs from pinned tree metadata")
     for path, entry in tree_by_path.items():
         blob = by_path[path]
-        if entry.object_id != blob.git_object_id or entry.size_bytes != blob.size_bytes:
+        if (entry.object_id != blob.git_object_id or entry.size_bytes != blob.size_bytes
+                or entry.object_type != "blob" or entry.mode not in ("100644", "100755")):
             raise SnapshotBuildError(f"Blob does not match pinned tree metadata: {path}")
     ordered = tuple(by_path[path] for path in sorted(by_path))
     return commit, manifest_sha256, ordered
