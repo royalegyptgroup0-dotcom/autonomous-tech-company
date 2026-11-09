@@ -27,6 +27,12 @@ class SandboxProfile:
 
 
 _SANDBOX_FOLDER = r"C:\Validation"
+_REPARSE_POINT = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+
+
+def _is_link_or_reparse_point(metadata: os.stat_result) -> bool:
+    attributes = getattr(metadata, "st_file_attributes", 0)
+    return stat.S_ISLNK(metadata.st_mode) or bool(attributes & _REPARSE_POINT)
 
 
 def _absolute_existing_directory(value: str | os.PathLike[str], label: str) -> Path:
@@ -44,11 +50,13 @@ def _absolute_existing_directory(value: str | os.PathLike[str], label: str) -> P
     for part in candidate.parts[1:]:
         current = current / part
         try:
-            mode = current.lstat().st_mode
+            metadata = current.lstat()
         except OSError as exc:
-            raise SandboxPolicyError(f"{label} contains a missing or inaccessible component") from exc
-        if stat.S_ISLNK(mode):
-            raise SandboxPolicyError(f"{label} cannot contain symlink components")
+            raise SandboxPolicyError(
+                f"{label} must be an existing directory; a path component is missing or inaccessible"
+            ) from exc
+        if _is_link_or_reparse_point(metadata):
+            raise SandboxPolicyError(f"{label} cannot contain symlink or reparse-point components")
 
     if not candidate.is_dir():
         raise SandboxPolicyError(f"{label} must be an existing directory")
