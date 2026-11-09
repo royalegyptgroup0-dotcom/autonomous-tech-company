@@ -10,32 +10,38 @@
     {
       "id": "autonomous-tech-company",
       "path": "",
-      "enabled": false
+      "enabled": false,
+      "review_files": []
     },
     {
       "id": "octopusa",
       "path": "",
-      "enabled": false
+      "enabled": false,
+      "review_files": []
     },
     {
       "id": "royal-media-player",
       "path": "",
-      "enabled": false
+      "enabled": false,
+      "review_files": []
     },
     {
       "id": "royal-egypt-group",
       "path": "",
-      "enabled": false
+      "enabled": false,
+      "review_files": []
     },
     {
       "id": "royal-egypt-agent",
       "path": "",
-      "enabled": false
+      "enabled": false,
+      "review_files": []
     },
     {
       "id": "ceo-notes",
       "path": "",
-      "enabled": false
+      "enabled": false,
+      "review_files": []
     }
   ]
 }
