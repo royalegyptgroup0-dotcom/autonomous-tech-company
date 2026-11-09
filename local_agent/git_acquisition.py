@@ -195,6 +195,8 @@ def acquire_and_verify_pinned_blobs(
         raise GitAcquisitionError("Archive inspection byte count is invalid")
     if not isinstance(archive_inspection.total_file_bytes, int) or isinstance(archive_inspection.total_file_bytes, bool) or not 0 <= archive_inspection.total_file_bytes <= 20_000_000:
         raise GitAcquisitionError("Archive inspection total file size is invalid")
+    if archive_inspection.bytes_read < archive_inspection.total_file_bytes:
+        raise GitAcquisitionError("Archive inspection byte count is smaller than its file content total")
     if not isinstance(archive_inspection.manifest_sha256, str) or not _SHA256.fullmatch(archive_inspection.manifest_sha256):
         raise GitAcquisitionError("Archive inspection manifest digest is invalid")
     if not isinstance(archive_inspection.files, tuple) or not archive_inspection.files:
