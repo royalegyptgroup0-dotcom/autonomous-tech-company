@@ -88,4 +88,27 @@ if ($featureQuery) {
 }
 
 Write-Host ""
+Write-Host "Native Windows Sandbox CLI (read-only):"
+try {
+    $osVersion = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
+    $buildNumber = 0
+    if (-not [int]::TryParse([string]$osVersion.BuildNumber, [ref]$buildNumber)) {
+        throw "Windows build number is unavailable."
+    }
+    Write-Host ("Windows build number: {0}" -f $buildNumber)
+    if ($buildNumber -ge 26100) {
+        $wsbCommand = Get-Command wsb -ErrorAction SilentlyContinue
+        if ($wsbCommand) {
+            Write-Host ("[FOUND] Native Sandbox CLI: {0}" -f $wsbCommand.Source) -ForegroundColor Green
+        } else {
+            Write-Host "[UNKNOWN] Windows 11 24H2+ build detected, but 'wsb' is not available in PATH." -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "[INFO] The documented native 'wsb' CLI starts with Windows 11 24H2 (build 26100); this host is below that build." -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host "[UNKNOWN] Could not inspect native Sandbox CLI availability: $($_.Exception.Message)" -ForegroundColor Yellow
+}
+
+Write-Host ""
 Write-Host "This check is advisory. It does not enable Windows features, guarantee model compatibility, launch Sandbox, or run the engineering agent."
