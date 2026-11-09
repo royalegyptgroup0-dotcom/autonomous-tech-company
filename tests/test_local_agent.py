@@ -216,3 +216,16 @@ def test_safe_read_rejects_symlink_escape(tmp_path: Path):
     except (OSError, NotImplementedError):
         pytest.skip("Symlink creation is not permitted on this host")
     assert safe_read(root, "linked.txt") == ""
+
+def test_safe_read_rejects_symlink_directory_escape(tmp_path: Path):
+    root = tmp_path / "repo"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "private.txt").write_text("outside directory secret", encoding="utf-8")
+    link = root / "linked-dir"
+    try:
+        link.symlink_to(outside, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("Directory symlink creation is not permitted on this host")
+    assert safe_read(root, "linked-dir/private.txt") == ""
