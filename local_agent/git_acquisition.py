@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from io import BytesIO
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -28,10 +29,24 @@ class GitAcquisitionError(ValueError):
 
 
 @dataclass(frozen=True)
+class VerifiedBlobContent:
+    """Blob bytes retained only after Git object ID and archive SHA-256 checks."""
+    path: str
+    content: bytes
+    size_bytes: int
+    git_object_id: str
+    object_format: str
+    sha256: str
+
+
+@dataclass(frozen=True)
 class GitAcquisitionResult:
     inspection: GitInspection
     tree: PinnedTreeMetadata
     blob_verifications: tuple[GitBlobVerification, ...]
+    pinned_commit: str
+    manifest_sha256: str
+    blob_contents: tuple[VerifiedBlobContent, ...]
 
 
 Runner = Callable[[list[str], Path, dict[str, str], int, int], bytes]
@@ -71,23 +86,15 @@ def _run_git_bounded(
     """Run fixed Git argv with bounded stdout, timeout and no shell."""
     if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool) or not 1 <= timeout_seconds <= 30:
         raise GitAcquisitionError("Git timeout is outside its safe bound")
-    if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool) or not 1 <= timeout_seconds <= 30:
-        raise GitAcquisitionError("Git timeout is outside its safe bound")
     if not isinstance(max_output_bytes, int) or isinstance(max_output_bytes, bool) or not 1 <= max_output_bytes <= _MAX_GIT_OUTPUT:
         raise GitAcquisitionError("Git output limit is outside its safe bound")
     try:
         process = subprocess.Popen(
-            argv,
-            cwd=str(cwd),
-            env=env,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            shell=False,
+            argv, cwd=str(cwd), env=env, stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False,
         )
     except OSError as exc:
         raise GitAcquisitionError(f"Git command could not start: {type(exc).__name__}") from exc
-
     if process.stdout is None or process.stderr is None:
         process.kill()
         process.wait()
@@ -141,7 +148,6 @@ def _run_git_bounded(
         err_thread.join(timeout=2)
         process.stdout.close()
         process.stderr.close()
-
     if timed_out:
         raise GitAcquisitionError("Git command exceeded its time limit")
     if overflow.is_set() or output_size > max_output_bytes:
@@ -165,11 +171,11 @@ def acquire_and_verify_pinned_blobs(
     _runner: Runner | None = None,
     _inspection_runner=None,
 ) -> GitAcquisitionResult:
-    """Verify one exact allowlist of archive-inspected files against pinned Git blobs.
+    """Verify an exact allowlist of archive-inspected files against pinned Git blobs.
 
     The archive inspection must be the completed bounded inspection of this
-    same pinned snapshot. Its manifest digest and exact file sizes are cross-checked.
-    Test-only runners may be injected; production uses the built-in runner.
+    same pinned snapshot. Its manifest digest, file set, sizes and byte totals
+    are cross-checked before any content is retained.
     """
     if not isinstance(pinned_commit, str) or not _HEX_COMMIT.fullmatch(pinned_commit):
         raise GitAcquisitionError("A full lowercase pinned commit ID is required")
@@ -202,9 +208,7 @@ def acquire_and_verify_pinned_blobs(
         raise GitAcquisitionError("Archive inspection byte count is smaller than its file content total")
     if not isinstance(archive_inspection.manifest_sha256, str) or not _SHA256.fullmatch(archive_inspection.manifest_sha256):
         raise GitAcquisitionError("Archive inspection manifest digest is invalid")
-    if not isinstance(archive_inspection.files, tuple):
-        raise GitAcquisitionError("Archive inspection file records must be an immutable tuple")
-    if len(archive_inspection.files) != len(safe_paths):
+    if not isinstance(archive_inspection.files, tuple) or len(archive_inspection.files) != len(safe_paths):
         raise GitAcquisitionError("Archive inspection files must exactly match the requested allowlist")
     archive_files: dict[str, ArchiveFileDigest] = {}
     for item in archive_inspection.files:
@@ -225,11 +229,8 @@ def acquire_and_verify_pinned_blobs(
         raise GitAcquisitionError("Archive inspection files must exactly match the requested allowlist")
 
     inspection = inspect_registered_worktree(
-        source_checkout,
-        candidate_worktree,
-        expected_origin=expected_origin,
-        pinned_commit=pinned_commit,
-        timeout_seconds=timeout_seconds,
+        source_checkout, candidate_worktree, expected_origin=expected_origin,
+        pinned_commit=pinned_commit, timeout_seconds=timeout_seconds,
         _runner=_inspection_runner,
     )
     git = shutil.which("git")
@@ -254,7 +255,6 @@ def acquire_and_verify_pinned_blobs(
         raise GitAcquisitionError("Pinned commit resolution returned invalid data") from exc
     if resolved != pinned_commit:
         raise GitAcquisitionError("Resolved commit differs from the requested pinned commit")
-
     try:
         object_format = command(["rev-parse", "--show-object-format"], 32).decode("ascii").strip()
     except (UnicodeDecodeError, AttributeError) as exc:
@@ -265,23 +265,10 @@ def acquire_and_verify_pinned_blobs(
         raise GitAcquisitionError("Pinned commit length does not match the repository object format")
 
     literal_pathspecs = [f":(literal){path}" for path in safe_paths]
-    tree_output = command(
-        ["ls-tree", "--full-tree", "-r", "-l", "-z", pinned_commit, "--", *literal_pathspecs],
-        _MAX_TREE_OUTPUT,
-    )
-    tree = parse_ls_tree_output(
-        tree_output,
-        expected_paths=safe_paths,
-        object_format=object_format,
-        max_output_bytes=_MAX_TREE_OUTPUT,
-    )
+    tree_output = command(["ls-tree", "--full-tree", "-r", "-l", "-z", pinned_commit, "--", *literal_pathspecs], _MAX_TREE_OUTPUT)
+    tree = parse_ls_tree_output(tree_output, expected_paths=safe_paths, object_format=object_format, max_output_bytes=_MAX_TREE_OUTPUT)
     try:
-        manifest = validate_snapshot_manifest(
-            commit=pinned_commit,
-            tree_entries=tree.snapshot_entries,
-            allowed_paths=safe_paths,
-            limits=SnapshotLimits(),
-        )
+        manifest = validate_snapshot_manifest(commit=pinned_commit, tree_entries=tree.snapshot_entries, allowed_paths=safe_paths, limits=SnapshotLimits())
     except ValueError as exc:
         raise GitAcquisitionError("Pinned tree did not satisfy the snapshot manifest policy") from exc
     if manifest.total_bytes != tree.total_bytes:
@@ -294,21 +281,18 @@ def acquire_and_verify_pinned_blobs(
         raise GitAcquisitionError("Archive file size does not match the pinned Git tree")
 
     verified: list[GitBlobVerification] = []
+    contents: list[VerifiedBlobContent] = []
     for entry in tree.entries:
         blob = command(["cat-file", "blob", entry.object_id], entry.size_bytes + 1)
         if len(blob) > entry.size_bytes:
             raise GitAcquisitionError("Git blob output exceeded its pinned size")
         try:
-            result = verify_git_blob_stream(
-                BytesIO(blob),
-                path=entry.path,
-                expected_size=entry.size_bytes,
-                expected_git_oid=entry.object_id,
-                expected_sha256=archive_files[entry.path].sha256,
-                object_format=object_format,
-            )
+            result = verify_git_blob_stream(BytesIO(blob), path=entry.path, expected_size=entry.size_bytes,
+                expected_git_oid=entry.object_id, expected_sha256=archive_files[entry.path].sha256,
+                object_format=object_format)
         except ValueError as exc:
             raise GitAcquisitionError(f"Pinned Git blob verification failed for {entry.path}") from exc
         verified.append(result)
+        contents.append(VerifiedBlobContent(entry.path, blob, len(blob), entry.object_id, object_format, result.sha256))
 
-    return GitAcquisitionResult(inspection, tree, tuple(verified))
+    return GitAcquisitionResult(inspection, tree, tuple(verified), pinned_commit, manifest.sha256, tuple(contents))
