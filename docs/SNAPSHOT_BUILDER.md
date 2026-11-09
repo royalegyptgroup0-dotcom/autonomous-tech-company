@@ -26,7 +26,9 @@ The builder then:
   files and directories against the expected manifest.
 
 Cleanup requires the returned in-memory ownership receipt and an exact matching
-marker. It refuses to remove anything if a symlink, reparse point, unexpected
+marker. The token itself is never written to disk. This is an accidental-deletion guard,
+not an authentication boundary against a process that can read the in-memory receipt.
+It refuses to remove anything if a symlink, reparse point, unexpected
 file, unexpected directory or marker mismatch is found. It removes only the
 expected files, marker, expected directories and the unique owned root.
 
