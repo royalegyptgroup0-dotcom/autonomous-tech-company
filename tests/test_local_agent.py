@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from local_agent.engine import (
-    AgentError, PROJECT_ID, _open_local_ollama, load_config,
+    AgentError, PROJECT_ID, _open_local_ollama, collect_snapshot, load_config,
     local_ollama_base_url, safe_read,
 )
 
@@ -127,3 +127,36 @@ def test_example_config_does_not_enable_unverified_paths():
     assert example["projects"]
     assert all(project["enabled"] is False for project in example["projects"])
     assert all(project["path"] == "" for project in example["projects"])
+
+
+
+def test_config_rejects_invalid_review_file_allowlist(tmp_path, monkeypatch):
+    config_path, root = _write_agent_config(tmp_path, root_workspace := tmp_path / "outside")
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    config["projects"][0]["review_files"] = "src/main.py"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    monkeypatch.setattr(
+        "local_agent.engine.subprocess.run",
+        lambda *args, **kwargs: SimpleNamespace(stdout=str(root)),
+    )
+    with pytest.raises(AgentError, match="review_files"):
+        load_config(config_path)
+
+
+def test_snapshot_includes_only_explicitly_allowlisted_source_contents(tmp_path, monkeypatch):
+    root = tmp_path / "repo"
+    source_dir = root / "src"
+    source_dir.mkdir(parents=True)
+    (source_dir / "allowed.py").write_text("SAFE_REVIEW_CONTENT = 42", encoding="utf-8")
+    (source_dir / "not_allowed.py").write_text("DO_NOT_INCLUDE_THIS_CONTENT", encoding="utf-8")
+    monkeypatch.setattr(
+        "local_agent.engine.subprocess.run",
+        lambda *args, **kwargs: SimpleNamespace(stdout="mocked git output"),
+    )
+    snapshot = collect_snapshot({
+        "id": "sample-repo",
+        "resolved_path": root,
+        "review_files": ["src/allowed.py"],
+    })
+    assert "SAFE_REVIEW_CONTENT = 42" in snapshot
+    assert "DO_NOT_INCLUDE_THIS_CONTENT" not in snapshot
