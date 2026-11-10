@@ -17,7 +17,7 @@ def test_company_agent_profiles_exist_and_keep_safe_defaults():
     assert EXPECTED <= profiles.keys()
     for name in EXPECTED:
         source = profiles[name].read_text(encoding="utf-8")
-        assert source.startswith("---\\n")
+        assert source.splitlines()[0] == "---"
         assert re.search(r"(?m)^mode: (primary|subagent)$", source)
         assert re.search(r"(?m)^edit: ask$", source)
         assert re.search(r"(?m)^bash: ask$", source)
