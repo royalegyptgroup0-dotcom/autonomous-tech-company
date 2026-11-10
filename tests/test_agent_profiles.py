@@ -11,7 +11,6 @@ EXPECTED = {
     "saas-development", "documentation",
 }
 
-
 def test_company_agent_profiles_exist_and_keep_safe_defaults():
     profiles = {path.stem: path for path in AGENTS.glob("*.md")}
     assert EXPECTED <= profiles.keys()
@@ -19,7 +18,7 @@ def test_company_agent_profiles_exist_and_keep_safe_defaults():
         source = profiles[name].read_text(encoding="utf-8")
         assert source.splitlines()[0] == "---"
         assert re.search(r"(?m)^mode: (primary|subagent)$", source)
-        assert re.search(r"(?m)^edit: ask$", source)
-        assert re.search(r"(?m)^bash: ask$", source)
+        assert re.search(r"(?m)^  edit: ask$", source)
+        assert re.search(r"(?m)^  bash: ask$", source)
         assert "do not call paid hosted models or APIs" in source
         assert "Human approval is mandatory" in source
