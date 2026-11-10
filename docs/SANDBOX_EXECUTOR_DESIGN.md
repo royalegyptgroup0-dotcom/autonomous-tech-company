@@ -24,6 +24,16 @@ It must not accept model-generated shell text, arbitrary argv, arbitrary environ
 7. The only mapped host folder is the disposable snapshot. Never map the source checkout, home directory, temp root, credentials, package cache, or other host folders.
 8. The .wsb file is created exclusively in a private temporary directory with restrictive ACLs and removed only after Sandbox exits.
 
+## Snapshot integrity prerequisite — blocking gap
+The current snapshot receipt records the pinned commit, manifest digest, owner token and file paths, but does not expose a per-file size/SHA-256 inventory that a later executor can independently re-check. The current ownership marker likewise records paths but not per-file content digests. The snapshot builder verifies source blob bytes before writing and checks the resulting directory/file set, but that is not proof that the snapshot remains unchanged after creation.
+
+Therefore, **do not implement or enable Sandbox launch against the current path-only profile API**. Before executor implementation:
+- Extend the immutable snapshot receipt and ownership marker with the exact per-file relative path, byte size and SHA-256 digest inventory derived from verified Git blobs.
+- Add a non-destructive verifier that validates the receipt schema, ownership marker, exact directory/file set, rejects links/reparse points and recomputes every file size and SHA-256 digest.
+- Bind profile creation to the validated receipt rather than accepting an arbitrary snapshot path; revalidate immediately before creating/launching the profile to reduce time-of-check/time-of-use exposure.
+- Add adversarial tests for modified bytes, same-size replacement, missing/extra files, forged marker, forged receipt, links/reparse points and source/snapshot overlap.
+- Keep the executor disabled until this prerequisite and its tests are complete.
+
 ## Execution contract
 - Commands run only inside Sandbox from a fixed in-sandbox bootstrap. The host never concatenates model text into a command line.
 - The bootstrap resolves command names against the exact trusted registry payload and executes registered argv without a shell.
